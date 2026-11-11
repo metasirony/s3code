@@ -352,6 +352,112 @@ it("routes only enrolled workflow members after the root turn ends", () => {
   );
 });
 
+it("routes a skill observation only to the run it names", () => {
+  const threadId = ThreadId.make("thread:skill-route");
+  const childThreadId = ThreadId.make("thread:skill-route:child");
+  const runId = RunId.make("run:skill-route");
+  const laterRunId = RunId.make("run:skill-route:later");
+  const parent = {
+    threadId,
+    runId,
+    attemptId: RunAttemptId.make("attempt:skill-route"),
+    providerThreadId: ProviderThreadId.make("provider-thread:skill-route"),
+  } as const;
+  const childRun = {
+    ...parent,
+    threadId: childThreadId,
+    runId: RunId.make("run:skill-route:child"),
+    attemptId: RunAttemptId.make("attempt:skill-route:child"),
+  } as const;
+  const laterParent = { ...parent, runId: laterRunId } as const;
+  const created = {
+    type: "app_thread.created",
+    driver,
+    appThread: {
+      id: childThreadId,
+      lineage: {
+        parentThreadId: threadId,
+        relationshipToParent: "subagent",
+        rootThreadId: threadId,
+      },
+    },
+  } as ProviderAdapter.ProviderAdapterV2Event;
+  const observation = {
+    type: "skill_invocation.observed",
+    driver,
+    invocation: {
+      id: "skill-route",
+      threadId: childThreadId,
+      runId,
+      providerTurnId: ProviderTurnId.make("provider-turn:skill-route:child"),
+      messageId: null,
+      turnItemId: TurnItemId.make("item:skill-route"),
+      nativeItemId: "native-skill-route",
+      occurrence: 0,
+      source: "agent_observed",
+      skill: {
+        key: "skill:route",
+        name: "review",
+        path: "/skills/review/SKILL.md",
+        scope: "user",
+        pluginId: null,
+      },
+      observedAt: "2026-06-01T00:00:00.000Z",
+    },
+  } as const satisfies ProviderAdapter.ProviderAdapterV2Event;
+  const withChild = RunExecutionService.routeProviderEvent(
+    created,
+    parent,
+    RunExecutionService.makeProviderEventRoutingState({
+      identity: parent,
+      providerTurnId: ProviderTurnId.make("provider-turn:skill-route"),
+    }),
+  )[1];
+  const laterWithChild = RunExecutionService.routeProviderEvent(
+    created,
+    laterParent,
+    RunExecutionService.makeProviderEventRoutingState({
+      identity: laterParent,
+      providerTurnId: ProviderTurnId.make("provider-turn:skill-route:later"),
+    }),
+  )[1];
+  assert.isTrue(RunExecutionService.routeProviderEvent(observation, parent, withChild)[0]);
+  const nativeTurn = {
+    type: "provider_turn.updated",
+    driver,
+    threadId: childThreadId,
+    bindingRunId: runId,
+    providerTurn: {
+      id: ProviderTurnId.make("provider-turn:skill-route:child"),
+      providerThreadId: ProviderThreadId.make("provider-thread:skill-route:child"),
+      nodeId: NodeId.make("node:skill-route:child"),
+      runAttemptId: null,
+      nativeTurnRef: null,
+      ordinal: 1,
+      status: "running",
+      startedAt: null,
+      completedAt: null,
+    },
+  } as const satisfies ProviderAdapter.ProviderAdapterV2Event;
+  assert.isTrue(RunExecutionService.routeProviderEvent(nativeTurn, parent, withChild)[0]);
+  assert.isFalse(
+    RunExecutionService.routeProviderEvent(nativeTurn, laterParent, laterWithChild)[0],
+  );
+  assert.isFalse(
+    RunExecutionService.routeProviderEvent(observation, laterParent, laterWithChild)[0],
+  );
+  assert.isFalse(
+    RunExecutionService.routeProviderEvent(
+      observation,
+      childRun,
+      RunExecutionService.makeProviderEventRoutingState({
+        identity: childRun,
+        providerTurnId: null,
+      }),
+    )[0],
+  );
+});
+
 it("moves a child thread to the run that shows its subagent now", () => {
   const threadId = ThreadId.make("thread:handoff");
   const rootProviderTurnId = ProviderTurnId.make("provider-turn:handoff");

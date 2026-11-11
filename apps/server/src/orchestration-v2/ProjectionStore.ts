@@ -1,4 +1,3 @@
-import { SkillInvocation } from "@t3tools/contracts";
 import { makeSkillStatistics } from "./SkillStatistics.ts";
 import type { ProjectThreadAwarenessV2Input } from "@t3tools/shared/agentAwareness";
 import { pendingGuestMessageCount } from "@t3tools/contracts";
@@ -115,8 +114,6 @@ import {
   THREAD_HISTORY_INLINE_WORK_ITEM_LIMIT,
   THREAD_HISTORY_TURN_SNAPSHOT_ROW_LIMIT,
 } from "./threadHistoryPaging.ts";
-
-const encodeSkillInvocation = Schema.encodeEffect(Schema.fromJsonString(SkillInvocation));
 
 export class ProjectionStoreApplyEventError extends Schema.TaggedError<ProjectionStoreApplyEventError>()(
   "ProjectionStoreApplyEventError",
@@ -2654,6 +2651,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 provider_thread_id,
                 node_id,
                 run_attempt_id,
+                binding_run_id,
                 ordinal,
                 status,
                 started_at,
@@ -2666,6 +2664,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 ${providerTurn.providerThreadId},
                 ${providerTurn.nodeId},
                 ${providerTurn.runAttemptId},
+                ${event.runId ?? null},
                 ${providerTurn.ordinal},
                 ${providerTurn.status},
                 ${nullableStringField(payload, "startedAt")},
@@ -2678,6 +2677,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 provider_thread_id = excluded.provider_thread_id,
                 node_id = excluded.node_id,
                 run_attempt_id = excluded.run_attempt_id,
+                binding_run_id = COALESCE(orchestration_v2_projection_provider_turns.binding_run_id, excluded.binding_run_id),
                 ordinal = excluded.ordinal,
                 status = excluded.status,
                 started_at = excluded.started_at,
@@ -2801,12 +2801,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
               break;
             }
             case "skill-invocation.observed": {
-              const invocation = event.payload;
-              const payloadJson = yield* encodeSkillInvocation(invocation);
-              yield* sql`INSERT INTO orchestration_v2_skill_invocations
-                (invocation_id, thread_id, run_id, skill_key, source, payload_json)
-                VALUES (${invocation.id}, ${invocation.threadId}, ${invocation.runId}, ${invocation.skill.key}, ${invocation.source}, ${payloadJson})
-                ON CONFLICT(invocation_id) DO NOTHING`;
+              yield* skillStatistics.recordSkillInvocation(event.payload);
               break;
             }
             case "turn-item.updated": {

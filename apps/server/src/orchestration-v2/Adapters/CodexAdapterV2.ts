@@ -59,6 +59,7 @@ import { appendGeneratedImageEmbeds } from "@t3tools/shared/generatedImageMarkdo
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
 import { mcpToolResultOutput } from "@t3tools/shared/toolOutput";
 import type {
+  SkillInvocation,
   ChatAttachment,
   OrchestrationV2AppThread,
   OrchestrationV2ConversationMessage,
@@ -1226,6 +1227,7 @@ interface ActiveCodexTurnContext {
   };
   readonly nativeStartReady?: Deferred.Deferred<void>;
   readonly input: ProviderAdapter.ProviderAdapterV2TurnInput;
+  readonly skillAncestry?: SkillInvocation["nativeAncestry"];
   readonly projectionAppThread: OrchestrationV2AppThread;
   readonly projectionThreadId: ThreadId;
   readonly projectionRunId: ProviderAdapter.ProviderAdapterV2TurnInput["runId"] | null;
@@ -2902,6 +2904,15 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   });
             const activeContext: ActiveCodexTurnContext = {
               input: subagent.parentContext.input,
+              skillAncestry: [
+                {
+                  threadId: subagent.parentContext.projectionThreadId,
+                  runId: subagent.parentContext.input.runId,
+                  providerTurnId: subagent.parentContext.providerTurnId,
+                  subagentId: subagent.task.id,
+                },
+                ...(subagent.parentContext.skillAncestry ?? []),
+              ],
               projectionAppThread: subagent.childThread,
               projectionThreadId: subagent.childThreadId,
               projectionRunId: null,
@@ -2947,6 +2958,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               type: "provider_turn.updated",
               driver: CODEX_PROVIDER,
               threadId: subagent.childThreadId,
+              bindingRunId: activeContext.input.runId,
               providerTurn: {
                 id: providerTurnId,
                 providerThreadId: subagent.providerThread.id,
@@ -5378,32 +5390,35 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               if (context.closedCommandItemIds?.has(payload.item.id)) return;
               const turnDrained = yield* clearRunningCommandItem(payload.turnId, payload.item.id);
               const artifacts = yield* buildCommandExecutionArtifacts(context, payload.item);
-              if (context.projectionRunId !== null) {
-                const reads = observedCodexSkillReads(payload.item, skillCatalog, NodeOS.homedir());
-                for (const [occurrence, skill] of reads.entries()) {
-                  yield* emitProviderEvent({
-                    type: "skill_invocation.observed",
-                    driver: CODEX_PROVIDER,
-                    invocation: {
-                      id: yield* encodeSkillObservationId([
-                        context.projectionThreadId,
-                        payload.turnId,
-                        payload.item.id,
-                        String(occurrence),
-                      ]),
-                      threadId: context.projectionThreadId,
-                      runId: context.projectionRunId,
-                      providerTurnId: context.providerTurnId,
-                      messageId: null,
-                      turnItemId: artifacts.turnItem.id,
-                      nativeItemId: payload.item.id,
-                      occurrence,
-                      source: "agent_observed",
-                      skill,
-                      observedAt: DateTime.formatIso(artifacts.turnItem.updatedAt),
-                    },
-                  });
-                }
+              // Native children have no run. Credit the ancestor run that owns this turn.
+              const bindingRunId = context.input.runId;
+              const reads = observedCodexSkillReads(payload.item, skillCatalog, NodeOS.homedir());
+              for (const [occurrence, skill] of reads.entries()) {
+                yield* emitProviderEvent({
+                  type: "skill_invocation.observed",
+                  driver: CODEX_PROVIDER,
+                  invocation: {
+                    id: yield* encodeSkillObservationId([
+                      context.projectionThreadId,
+                      payload.turnId,
+                      payload.item.id,
+                      String(occurrence),
+                    ]),
+                    threadId: context.projectionThreadId,
+                    runId: bindingRunId,
+                    ...(context.skillAncestry === undefined
+                      ? {}
+                      : { nativeAncestry: context.skillAncestry }),
+                    providerTurnId: context.providerTurnId,
+                    messageId: null,
+                    turnItemId: artifacts.turnItem.id,
+                    nativeItemId: payload.item.id,
+                    occurrence,
+                    source: "agent_observed",
+                    skill,
+                    observedAt: DateTime.formatIso(artifacts.turnItem.updatedAt),
+                  },
+                });
               }
               yield* emitProviderEvent({
                 type: "node.updated",

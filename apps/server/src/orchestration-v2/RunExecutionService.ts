@@ -416,8 +416,11 @@ export function routeProviderEvent(
       return belongs ? [true, addProviderThread(event.providerThread.id)] : [false, state];
     }
     case "skill_invocation.observed":
+      // The observation names the run that records it. Another live subscription
+      // that only owns the executor thread must not ingest it again.
       return [event.invocation.runId === input.runId, state];
     case "provider_turn.updated": {
+      if (event.bindingRunId !== undefined && !ownsRun(event.bindingRunId)) return [false, state];
       const isRoot = event.providerTurn.runAttemptId === input.attemptId;
       const belongs =
         isRoot ||

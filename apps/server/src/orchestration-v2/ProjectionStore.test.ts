@@ -3001,6 +3001,459 @@ it.effect(
     }).pipe(Effect.provide(layerTest)),
 );
 
+it.effect("keeps descendant skill credits on the parent run that owned the child", () =>
+  Effect.gen(function* () {
+    const store = yield* ProjectionStore.ProjectionStoreV2;
+    const parentId = yield* addRolledBackRecoveryCandidate("skill-children");
+    const parent = yield* store.getThreadProjection(parentId);
+    const now = parent.updatedAt;
+    const template = parent.runs[0]!;
+    const skill = {
+      key: "user:/skills/review/SKILL.md",
+      name: "review",
+      path: "/skills/review/SKILL.md",
+      scope: "user",
+      pluginId: null,
+    };
+    const parentRun = (ordinal: number, id: string) => ({
+      ...template,
+      id: RunId.make(id),
+      ordinal,
+      status: "completed" as const,
+      completedAt: now,
+    });
+    const first = parentRun(2, "skill-children:parent-1");
+    const second = parentRun(3, "skill-children:parent-2");
+    const empty = parentRun(4, "skill-children:parent-empty");
+    const nativeId = ThreadId.make("thread:skill-children:native");
+    const nestedId = ThreadId.make("thread:skill-children:nested");
+    const appId = ThreadId.make("thread:skill-children:app");
+    const nativeTaskId = NodeId.make("node:skill-children:native");
+    const nestedTaskId = NodeId.make("node:skill-children:nested");
+    const appTaskId = NodeId.make("node:skill-children:app");
+    const appFollowupTaskId = NodeId.make("node:skill-children:app-followup");
+    const childThread = (threadId: ThreadId, parentThreadId: ThreadId, nodeId: NodeId) => ({
+      ...parent.thread,
+      id: threadId,
+      title: threadId,
+      lineage: {
+        parentThreadId,
+        relationshipToParent: "subagent" as const,
+        rootThreadId: parentId,
+      },
+      forkedFrom: { type: "node" as const, nodeId },
+      activeProviderThreadId: null,
+      deletedAt: null,
+    });
+    const task = (input: {
+      readonly id: NodeId;
+      readonly threadId: ThreadId;
+      readonly runId: RunId | null;
+      readonly childThreadId: ThreadId;
+      readonly origin: "provider_native" | "app_owned";
+    }) => ({
+      id: input.id,
+      threadId: input.threadId,
+      runId: input.runId,
+      parentNodeId: input.id,
+      origin: input.origin,
+      createdBy: "agent" as const,
+      driver,
+      providerInstanceId,
+      providerThreadId: null,
+      childThreadId: input.childThreadId,
+      nativeTaskRef: null,
+      prompt: "read the skill",
+      title: null,
+      model: null,
+      status: "running" as const,
+      result: null,
+      startedAt: now,
+      completedAt: null,
+      updatedAt: now,
+    });
+    const appRun = (ordinal: number, id: string, delegatedTaskId?: NodeId) => ({
+      ...template,
+      id: RunId.make(id),
+      threadId: appId,
+      ordinal,
+      status: "completed" as const,
+      completedAt: now,
+      ...(delegatedTaskId === undefined ? {} : { delegatedTaskId }),
+    });
+    const appFirst = appRun(1, "skill-children:app-1");
+    const appRestart = {
+      ...appRun(2, "skill-children:app-restart"),
+      restartContinuationOfRunId: appFirst.id,
+    };
+    const appSecond = appRun(3, "skill-children:app-2", appFollowupTaskId);
+    const appOwn = appRun(4, "skill-children:app-own");
+    for (const run of [first, second, empty]) {
+      yield* store.apply({
+        id: EventId.make(`skill-children:run:${run.id}`),
+        type: "run.created",
+        threadId: parentId,
+        occurredAt: now,
+        payload: run,
+      });
+    }
+    for (const thread of [
+      childThread(nativeId, parentId, nativeTaskId),
+      childThread(nestedId, nativeId, nestedTaskId),
+      childThread(appId, parentId, appTaskId),
+    ]) {
+      yield* store.apply({
+        id: EventId.make(`skill-children:thread:${thread.id}`),
+        type: "thread.created",
+        threadId: thread.id,
+        occurredAt: now,
+        payload: thread,
+      });
+    }
+    for (const run of [appFirst, appRestart, appSecond, appOwn]) {
+      yield* store.apply({
+        id: EventId.make(`skill-children:run:${run.id}`),
+        type: "run.created",
+        threadId: appId,
+        occurredAt: now,
+        payload: run,
+      });
+    }
+    const tasks = [
+      task({
+        id: nativeTaskId,
+        threadId: parentId,
+        runId: first.id,
+        childThreadId: nativeId,
+        origin: "provider_native",
+      }),
+      task({
+        id: nestedTaskId,
+        threadId: nativeId,
+        runId: null,
+        childThreadId: nestedId,
+        origin: "provider_native",
+      }),
+      task({
+        id: appTaskId,
+        threadId: parentId,
+        runId: first.id,
+        childThreadId: appId,
+        origin: "app_owned",
+      }),
+      task({
+        id: appFollowupTaskId,
+        threadId: parentId,
+        runId: second.id,
+        childThreadId: appId,
+        origin: "app_owned",
+      }),
+    ];
+    for (const subagent of tasks) {
+      yield* store.apply({
+        id: EventId.make(`skill-children:task:${subagent.id}`),
+        type: "subagent.updated",
+        threadId: subagent.threadId,
+        occurredAt: now,
+        payload: subagent,
+      });
+    }
+    const observe = (input: {
+      readonly id: string;
+      readonly threadId: ThreadId;
+      readonly runId: RunId;
+      readonly duplicate?: boolean;
+    }) =>
+      Effect.gen(function* () {
+        const event = {
+          id: EventId.make(`skill-children:event:${input.id}`),
+          type: "skill-invocation.observed" as const,
+          threadId: input.threadId,
+          occurredAt: now,
+          payload: {
+            id: input.id,
+            threadId: input.threadId,
+            runId: input.runId,
+            providerTurnId: ProviderTurnId.make(`turn:${input.id}`),
+            messageId: null,
+            turnItemId: TurnItemId.make(`item:${input.id}`),
+            nativeItemId: `native:${input.id}`,
+            occurrence: 0,
+            source: "agent_observed" as const,
+            skill,
+            observedAt: DateTime.formatIso(now),
+          },
+        };
+        yield* store.apply(event);
+        if (input.duplicate) {
+          yield* store.apply({
+            ...event,
+            id: EventId.make(`skill-children:redelivery:${input.id}`),
+          });
+        }
+      });
+    yield* observe({ id: "parent", threadId: parentId, runId: first.id });
+    yield* observe({ id: "native-a", threadId: nativeId, runId: first.id, duplicate: true });
+    yield* observe({ id: "nested", threadId: nestedId, runId: first.id });
+    yield* observe({ id: "app-a", threadId: appId, runId: appRestart.id });
+    yield* store.apply({
+      id: EventId.make("skill-children:native-resumed"),
+      type: "subagent.updated",
+      threadId: parentId,
+      occurredAt: now,
+      payload: task({
+        id: nativeTaskId,
+        threadId: parentId,
+        runId: second.id,
+        childThreadId: nativeId,
+        origin: "provider_native",
+      }),
+    });
+    yield* observe({ id: "native-c", threadId: nativeId, runId: second.id });
+    yield* observe({ id: "native-b", threadId: nativeId, runId: first.id });
+    yield* observe({ id: "app-b", threadId: appId, runId: appSecond.id });
+    yield* observe({ id: "app-own", threadId: appId, runId: appOwn.id });
+
+    const environment = yield* store.getSkillStatistics({});
+    const parentOwn = yield* store.getSkillStatistics({ threadId: parentId, scope: "own" });
+    const parentAll = yield* store.getSkillStatistics({ threadId: parentId, scope: "inclusive" });
+    const nativeOwn = yield* store.getSkillStatistics({ threadId: nativeId, scope: "own" });
+    const nativeAll = yield* store.getSkillStatistics({ threadId: nativeId, scope: "inclusive" });
+    const nestedOwn = yield* store.getSkillStatistics({ threadId: nestedId });
+    const appOwnStats = yield* store.getSkillStatistics({ threadId: appId, scope: "own" });
+    assert.equal(environment.scope, "own");
+    assert.equal(environment.total, 8);
+    assert.equal(
+      environment.threads.reduce((sum, thread) => sum + thread.total, 0),
+      environment.total,
+    );
+    assert.equal(parentOwn.total, 1);
+    assert.deepEqual(
+      parentOwn.runs.map((run) => run.total),
+      [1, 0, 0],
+    );
+    assert.equal(parentAll.total, 7);
+    assert.equal(parentAll.threads[0]?.latestRunId, empty.id);
+    assert.equal(parentAll.threads[0]?.latestRunCount, 0);
+    assert.equal(parentAll.threads[0]?.beforeLatestRunCount, 7);
+    assert.deepEqual(
+      parentAll.runs.map((run) => run.total),
+      [5, 2, 0],
+    );
+    assert.equal(nativeOwn.total, 3);
+    assert.equal(nativeOwn.threads[0]?.latestRunId, null);
+    assert.equal(nativeOwn.threads[0]?.latestRunCount, 0);
+    assert.equal(nativeOwn.threads[0]?.beforeLatestRunCount, 3);
+    assert.equal(nativeAll.total, 4);
+    assert.equal(nestedOwn.total, 1);
+    assert.equal(appOwnStats.total, 3);
+    assert.deepEqual(
+      appOwnStats.runs.map((run) => run.total),
+      [0, 1, 1, 1],
+    );
+    assert.equal((yield* store.getSkillStatistics({ runId: first.id })).total, 1);
+    assert.equal(
+      (yield* store.getSkillStatistics({ runId: first.id, scope: "inclusive" })).total,
+      5,
+    );
+    assert.equal(
+      (yield* store.getSkillStatistics({ runId: second.id, scope: "inclusive" })).total,
+      2,
+    );
+    assert.equal(
+      (yield* store.getSkillStatistics({ runId: appOwn.id, scope: "inclusive" })).total,
+      1,
+    );
+    const firstExecutors = (yield* store.getSkillStatistics({
+      runId: first.id,
+      scope: "inclusive",
+    })).executors;
+    assert.deepEqual(
+      firstExecutors.map((executor) => [
+        executor.threadId,
+        executor.role,
+        executor.origin,
+        executor.total,
+      ]),
+      [
+        [appId, "descendant", "app_owned", 1],
+        [nativeId, "descendant", "provider_native", 2],
+        [nestedId, "descendant", "provider_native", 1],
+        [parentId, "self", "root", 1],
+      ],
+    );
+    const credited = yield* store.getSkillInvocations({ threadId: parentId, scope: "inclusive" });
+    assert.deepEqual(
+      credited.invocations.map((invocation) => invocation.id),
+      ["parent", "native-a", "nested", "app-a", "native-c", "native-b", "app-b"],
+    );
+    assert.equal(
+      credited.invocations.find((invocation) => invocation.id === "native-c")?.providerTurnId,
+      ProviderTurnId.make("turn:native-c"),
+    );
+    assert.equal(
+      credited.invocations.find((invocation) => invocation.id === "native-c")?.runId,
+      second.id,
+    );
+    const reopened = yield* Effect.service(ProjectionStore.ProjectionStoreV2).pipe(
+      Effect.provide(ProjectionStore.layer),
+    );
+    assert.deepEqual(
+      yield* reopened.getSkillStatistics({ threadId: parentId, scope: "inclusive" }),
+      parentAll,
+    );
+
+    yield* store.apply({
+      id: EventId.make("skill-children:rollback-first"),
+      type: "run.updated",
+      threadId: parentId,
+      occurredAt: now,
+      payload: { ...first, status: "rolled_back" },
+    });
+    assert.equal((yield* store.getSkillStatistics({})).total, 4);
+    assert.equal((yield* store.getSkillStatistics({ threadId: parentId, scope: "own" })).total, 0);
+    assert.equal(
+      (yield* store.getSkillStatistics({ threadId: parentId, scope: "inclusive" })).total,
+      2,
+    );
+    assert.equal((yield* store.getSkillStatistics({ threadId: nativeId })).total, 1);
+    assert.equal((yield* store.getSkillStatistics({ threadId: nestedId })).total, 0);
+    assert.equal((yield* store.getSkillStatistics({ threadId: appId })).total, 3);
+    const appThread = yield* store.getThreadProjection(appId);
+    yield* store.apply({
+      id: EventId.make("skill-children:delete-app"),
+      type: "thread.deleted",
+      threadId: appId,
+      occurredAt: now,
+      payload: { ...appThread.thread, deletedAt: now },
+    });
+    assert.equal((yield* store.getSkillStatistics({})).total, 1);
+    assert.equal(
+      (yield* store.getSkillStatistics({ threadId: parentId, scope: "inclusive" })).total,
+      1,
+    );
+    assert.deepEqual((yield* store.getSkillInvocations({ threadId: appId })).invocations, []);
+    yield* store.apply({
+      id: EventId.make("skill-children:delete-parent"),
+      type: "thread.deleted",
+      threadId: parentId,
+      occurredAt: now,
+      payload: { ...parent.thread, deletedAt: now },
+    });
+    assert.equal((yield* store.getSkillStatistics({})).total, 0);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect(
+  "credits deeply nested app-owned skill reads without multiplying environment totals",
+  () =>
+    Effect.gen(function* () {
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const rootId = yield* addRolledBackRecoveryCandidate("deep-skills");
+      const root = yield* store.getThreadProjection(rootId);
+      const now = root.updatedAt;
+      const rootRun = { ...root.runs[0]!, status: "completed" as const };
+      yield* store.apply({
+        id: EventId.make("deep:root-run"),
+        type: "run.updated",
+        threadId: rootId,
+        occurredAt: now,
+        payload: rootRun,
+      });
+      let parentId = rootId;
+      let parentRunId = rootRun.id;
+      for (let depth = 1; depth <= 10; depth++) {
+        const childId = ThreadId.make(`deep:child:${depth}`);
+        const runId = RunId.make(`deep:run:${depth}`);
+        const taskId = NodeId.make(`deep:task:${depth}`);
+        yield* store.apply({
+          id: EventId.make(`deep:thread:${depth}`),
+          type: "thread.created",
+          threadId: childId,
+          occurredAt: now,
+          payload: {
+            ...root.thread,
+            id: childId,
+            deletedAt: null,
+            lineage: {
+              parentThreadId: parentId,
+              rootThreadId: rootId,
+              relationshipToParent: "subagent",
+            },
+            forkedFrom: { type: "node", nodeId: taskId },
+          },
+        });
+        yield* store.apply({
+          id: EventId.make(`deep:run:${depth}`),
+          type: "run.created",
+          threadId: childId,
+          occurredAt: now,
+          payload: { ...rootRun, id: runId, threadId: childId, ordinal: 1 },
+        });
+        yield* store.apply({
+          id: EventId.make(`deep:task:${depth}`),
+          type: "subagent.updated",
+          threadId: parentId,
+          occurredAt: now,
+          payload: {
+            id: taskId,
+            threadId: parentId,
+            runId: parentRunId,
+            parentNodeId: taskId,
+            childThreadId: childId,
+            origin: "app_owned",
+            createdBy: "agent",
+            driver,
+            providerInstanceId,
+            providerThreadId: null,
+            nativeTaskRef: null,
+            prompt: "read skill",
+            title: null,
+            model: null,
+            status: "completed",
+            result: null,
+            startedAt: now,
+            completedAt: now,
+            updatedAt: now,
+          },
+        });
+        parentId = childId;
+        parentRunId = runId;
+      }
+      yield* store.apply({
+        id: EventId.make("deep:observation"),
+        type: "skill-invocation.observed",
+        threadId: parentId,
+        occurredAt: now,
+        payload: {
+          id: "deep:read",
+          threadId: parentId,
+          runId: parentRunId,
+          providerTurnId: null,
+          messageId: null,
+          turnItemId: null,
+          nativeItemId: "read",
+          occurrence: 0,
+          source: "agent_observed",
+          skill: {
+            key: "deep:skill",
+            name: "review",
+            path: "/review/SKILL.md",
+            scope: "repo",
+            pluginId: null,
+          },
+          observedAt: DateTime.formatIso(now),
+        },
+      });
+      assert.equal((yield* store.getSkillStatistics({})).total, 1);
+      assert.equal((yield* store.getSkillStatistics({ threadId: rootId })).total, 0);
+      const inclusive = yield* store.getSkillStatistics({ threadId: rootId, scope: "inclusive" });
+      assert.equal(inclusive.total, 1);
+      assert.equal(inclusive.executors[0]?.threadId, parentId);
+      assert.equal((yield* store.getSkillStatistics({ threadId: parentId })).total, 1);
+    }).pipe(Effect.provide(layerTest)),
+);
+
 it.effect("keeps skill totals and the last empty run after closing and reopening SQLite", () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -3052,6 +3505,72 @@ it.effect("keeps skill totals and the last empty run after closing and reopening
         occurredAt: projection.updatedAt,
         payload: { ...run, id: RunId.make("restart:empty-run"), ordinal: 2, status: "completed" },
       });
+      const childId = ThreadId.make("restart:native-child");
+      yield* store.apply({
+        id: EventId.make("restart:child"),
+        type: "thread.created",
+        threadId: childId,
+        occurredAt: projection.updatedAt,
+        payload: {
+          ...projection.thread,
+          id: childId,
+          deletedAt: null,
+          lineage: { parentThreadId: id, rootThreadId: id, relationshipToParent: "subagent" },
+        },
+      });
+      for (const ordinal of [1, 2]) {
+        yield* store.apply({
+          id: EventId.make(`restart:native-turn:${ordinal}`),
+          type: "provider-turn.updated",
+          threadId: childId,
+          runId: run.id,
+          occurredAt: projection.updatedAt,
+          payload: {
+            id: ProviderTurnId.make(`restart:native:${ordinal}`),
+            providerThreadId: ProviderThreadId.make("restart:native-provider"),
+            nodeId: NodeId.make(`restart:native-node:${ordinal}`),
+            runAttemptId: null,
+            nativeTurnRef: null,
+            ordinal,
+            status: ordinal === 1 ? "completed" : "running",
+            startedAt: projection.updatedAt,
+            completedAt: ordinal === 1 ? projection.updatedAt : null,
+          },
+        });
+      }
+      yield* store.apply({
+        id: EventId.make("restart:native-skill"),
+        type: "skill-invocation.observed",
+        threadId: childId,
+        occurredAt: projection.updatedAt,
+        payload: {
+          id: "restart:native-invocation",
+          threadId: childId,
+          runId: run.id,
+          providerTurnId: ProviderTurnId.make("restart:native:1"),
+          nativeAncestry: [
+            {
+              threadId: id,
+              runId: run.id,
+              providerTurnId: ProviderTurnId.make("restart:parent-native"),
+              subagentId: NodeId.make("restart:subagent"),
+            },
+          ],
+          messageId: null,
+          turnItemId: TurnItemId.make("restart:read"),
+          nativeItemId: "restart:read",
+          occurrence: 0,
+          source: "agent_observed",
+          observedAt: DateTime.formatIso(projection.updatedAt),
+          skill: {
+            key: "skill:restart",
+            name: "review",
+            path: "/skills/review/SKILL.md",
+            scope: "repo",
+            pluginId: null,
+          },
+        },
+      });
       return id;
     }).pipe(Effect.provide(layer), Effect.scoped);
     yield* Effect.gen(function* () {
@@ -3064,6 +3583,21 @@ it.effect("keeps skill totals and the last empty run after closing and reopening
       assert.equal(
         (yield* store.getSkillInvocations({ threadId })).invocations[0]?.id,
         "restart:invocation",
+      );
+      assert.equal((yield* store.getSkillStatistics({ threadId, scope: "inclusive" })).total, 2);
+      const child = yield* store.getSkillStatistics({
+        threadId: ThreadId.make("restart:native-child"),
+      });
+      assert.equal(child.total, 1);
+      assert.equal(child.threads[0]?.latestNativeTurnId, ProviderTurnId.make("restart:native:2"));
+      assert.equal(child.threads[0]?.latestNativeTurnCount, 0);
+      assert.equal(child.threads[0]?.beforeLatestNativeTurnCount, 1);
+      assert.deepEqual(child.threads[0]?.activeNativeTurnIds, [
+        ProviderTurnId.make("restart:native:2"),
+      ]);
+      assert.deepEqual(
+        child.nativeTurns.map((turn) => turn.total),
+        [1, 0],
       );
     }).pipe(Effect.provide(Layer.fresh(layer)), Effect.scoped);
   }).pipe(Effect.provide(NodeServices.layer)),

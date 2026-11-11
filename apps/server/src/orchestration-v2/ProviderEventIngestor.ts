@@ -531,6 +531,9 @@ export const layer: Layer.Layer<
                   : []),
                 yield* makeDomainEvent(input, {
                   type: "provider-turn.updated",
+                  ...(input.event.bindingRunId === undefined
+                    ? {}
+                    : { runId: input.event.bindingRunId }),
                   ...(input.event.threadId === undefined ? {} : { threadId: input.event.threadId }),
                   payload: input.event.providerTurn,
                   nodeId: input.event.providerTurn.nodeId,

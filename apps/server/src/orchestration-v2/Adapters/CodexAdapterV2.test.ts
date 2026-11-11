@@ -988,6 +988,372 @@ it.effect(
     }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );
 
+it.effect("does not count a delegated prompt as a requested skill", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-skill-delegated-" });
+    const nativeThreadId = "delegated-skill-thread";
+    const nativeTurnId = "delegated-skill-turn";
+    const prompt = "$review";
+    const transcript = yield* decodeReplayTranscriptJson(
+      (yield* encodeReplayTranscriptJson(
+        makeCodexReplayTranscript({
+          scenario: "delegated-skill",
+          entries: [
+            ...codexReplayPreamble({ nativeThreadId, nativeTurnId, prompt }),
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "turn/completed",
+                params: {
+                  threadId: nativeThreadId,
+                  turn: makeCodexReplayTurn({ id: nativeTurnId, status: "completed" }),
+                },
+              },
+            },
+          ],
+        }),
+      )).replaceAll(yield* encodeStringJson("/workspace"), yield* encodeStringJson(cwd)),
+    );
+    const driver = yield* CodexReplay.makeReplayDriver(transcript);
+    yield* Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+      const threadId = ThreadId.make("thread:delegated-skill");
+      yield* orchestrator.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("create-delegated-skill"),
+        threadId,
+        projectId: ProjectId.make("project:delegated-skill"),
+        title: "Delegated skill",
+        modelSelection: CODEX_TEST_MODEL_SELECTION,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: cwd,
+        createdBy: "user",
+        creationSource: "web",
+      });
+      const completed = yield* orchestrator.streamDomainEvents.pipe(
+        Stream.filter(
+          (event) => event.type === "provider-turn.updated" && event.payload.status === "completed",
+        ),
+        Stream.runHead,
+        Effect.forkChild({ startImmediately: true }),
+      );
+      yield* orchestrator.dispatch({
+        type: "message.dispatch",
+        commandId: CommandId.make("start-delegated-skill"),
+        threadId,
+        messageId: MessageId.make("message:delegated-skill"),
+        text: prompt,
+        attachments: [],
+        createdBy: "agent",
+        creationSource: "provider",
+        dispatchMode: { type: "start_immediately" },
+      });
+      yield* worker.drain();
+      yield* Fiber.join(completed);
+      const stats = yield* orchestrator.getSkillStatistics({ threadId });
+      assert.equal(stats.total, 0);
+      assert.equal(stats.userRequested, 0);
+      assert.isNull((yield* Ref.get(driver.state)).failure);
+    }).pipe(
+      Effect.provide(
+        ProviderReplayHarness.layerWithRegistry(
+          { name: "delegated-skill", runtimePolicyOverride: { cwd } },
+          CodexAdapterV2Testkit.layer({
+            transcript,
+            driver,
+            skills: [
+              {
+                name: "review",
+                path: "/skills/review/SKILL.md",
+                scope: "user",
+                description: "Review",
+                enabled: true,
+              },
+            ],
+          }),
+          { runEffectWorker: false },
+        ),
+      ),
+    );
+  }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+);
+
+it.effect("counts native and nested Codex child skill reads on the owning run", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-skill-children-" });
+    const nativeThreadId = "skill-child-thread";
+    const nativeTurnId = "skill-child-turn";
+    const childThreadId = "skill-child-native";
+    const childTurnId = "skill-child-native-turn";
+    const nestedThreadId = "skill-nested-native";
+    const nestedTurnId = "skill-nested-native-turn";
+    const prompt = "$review";
+    const skill = {
+      name: "review",
+      path: "/skills/review/SKILL.md",
+      scope: "user" as const,
+      description: "Review",
+      enabled: true,
+    };
+    const selectedInput = [
+      { type: "skill", name: skill.name, path: skill.path },
+      { type: "text", text: prompt },
+    ];
+    const preamble = codexReplayPreamble({ nativeThreadId, nativeTurnId, prompt }).map((entry) => {
+      if (
+        entry.type !== "expect_outbound" ||
+        !Predicate.isObject(entry.frame) ||
+        entry.frame.method !== "turn/start" ||
+        !Predicate.isObject(entry.frame.params)
+      )
+        return entry;
+      return {
+        ...entry,
+        frame: { ...entry.frame, params: { ...entry.frame.params, input: selectedInput } },
+      };
+    });
+    const read = (
+      threadId: string,
+      turnId: string,
+      itemId: string,
+      command: string,
+    ): CodexReplay.CodexAppServerReplayEntry => ({
+      type: "emit_inbound",
+      frame: {
+        method: "item/completed",
+        params: {
+          threadId,
+          turnId,
+          completedAtMs: 1782622440000,
+          item: {
+            type: "commandExecution",
+            id: itemId,
+            command,
+            cwd: "/workspace",
+            processId: null,
+            status: "completed",
+            aggregatedOutput: "Review instructions",
+            exitCode: 0,
+            durationMs: 1,
+            commandActions: [],
+          },
+        },
+      },
+    });
+    const spawn = (
+      threadId: string,
+      turnId: string,
+      itemId: string,
+      childId: string,
+    ): CodexReplay.CodexAppServerReplayEntry => ({
+      type: "emit_inbound",
+      frame: {
+        method: "item/completed",
+        params: {
+          threadId,
+          turnId,
+          completedAtMs: 1782622441000,
+          item: {
+            type: "collabAgentToolCall",
+            id: itemId,
+            tool: "spawnAgent",
+            status: "completed",
+            senderThreadId: threadId,
+            receiverThreadIds: [childId],
+            prompt: "read the skill",
+            model: "gpt-5.4",
+            reasoningEffort: "low",
+            agentsStates: { [childId]: { status: "running", message: null } },
+          },
+        },
+      },
+    });
+    const started = (threadId: string, turnId: string): CodexReplay.CodexAppServerReplayEntry => ({
+      type: "emit_inbound",
+      frame: {
+        method: "turn/started",
+        params: {
+          threadId,
+          turn: makeCodexReplayTurn({ id: turnId, status: "inProgress" }),
+        },
+      },
+    });
+    const childRead = read(
+      childThreadId,
+      childTurnId,
+      "child-skill-read",
+      "cat /skills/review/SKILL.md && cat /skills/review/SKILL.md",
+    );
+    const transcript = yield* decodeReplayTranscriptJson(
+      (yield* encodeReplayTranscriptJson(
+        makeCodexReplayTranscript({
+          scenario: "skill-children",
+          entries: [
+            ...preamble,
+            read(nativeThreadId, nativeTurnId, "parent-skill-read", "cat /skills/review/SKILL.md"),
+            spawn(nativeThreadId, nativeTurnId, "spawn-child", childThreadId),
+            started(childThreadId, childTurnId),
+            childRead,
+            spawn(childThreadId, childTurnId, "spawn-nested", nestedThreadId),
+            started(nestedThreadId, nestedTurnId),
+            read(nestedThreadId, nestedTurnId, "nested-skill-read", "cat /skills/review/SKILL.md"),
+            childRead,
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "turn/completed",
+                params: {
+                  threadId: childThreadId,
+                  turn: makeCodexReplayTurn({ id: childTurnId, status: "completed" }),
+                },
+              },
+            },
+            started(childThreadId, "skill-child-empty-turn"),
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "turn/completed",
+                params: {
+                  threadId: childThreadId,
+                  turn: makeCodexReplayTurn({ id: "skill-child-empty-turn", status: "completed" }),
+                },
+              },
+            },
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "turn/completed",
+                params: {
+                  threadId: nativeThreadId,
+                  turn: makeCodexReplayTurn({ id: nativeTurnId, status: "completed" }),
+                },
+              },
+            },
+          ],
+        }),
+      )).replaceAll(yield* encodeStringJson("/workspace"), yield* encodeStringJson(cwd)),
+    );
+    const driver = yield* CodexReplay.makeReplayDriver(transcript);
+    yield* Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+      const threadId = ThreadId.make("thread:skill-children");
+      yield* orchestrator.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("create-skill-children"),
+        threadId,
+        projectId: ProjectId.make("project:skill-children"),
+        title: "Skill children",
+        modelSelection: CODEX_TEST_MODEL_SELECTION,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: cwd,
+        createdBy: "user",
+        creationSource: "web",
+      });
+      const reads = yield* orchestrator.streamDomainEvents.pipe(
+        Stream.filter(
+          (event) =>
+            event.type === "provider-turn.updated" &&
+            event.payload.nativeTurnRef?.nativeId === "skill-child-empty-turn" &&
+            event.payload.status === "completed",
+        ),
+        Stream.runHead,
+        Effect.forkChild({ startImmediately: true }),
+      );
+      yield* orchestrator.dispatch({
+        type: "message.dispatch",
+        commandId: CommandId.make("start-skill-children"),
+        threadId,
+        messageId: MessageId.make("message:skill-children"),
+        text: prompt,
+        attachments: [],
+        createdBy: "user",
+        creationSource: "web",
+        dispatchMode: { type: "start_immediately" },
+      });
+      yield* worker.drain();
+      yield* Fiber.join(reads);
+      yield* worker.drain();
+      const own = yield* orchestrator.getSkillStatistics({ threadId, scope: "own" });
+      const inclusive = yield* orchestrator.getSkillStatistics({ threadId, scope: "inclusive" });
+      assert.equal(own.total, 2);
+      assert.equal(own.userRequested, 1);
+      assert.equal(own.agentObserved, 1);
+      assert.equal(inclusive.total, 5);
+      assert.equal(inclusive.agentObserved, 4);
+      assert.equal(inclusive.runs[0]?.total, 5);
+      const page = yield* orchestrator.getSkillInvocations({ threadId, scope: "inclusive" });
+      const runId = own.threads[0]!.latestRunId!;
+      assert.isTrue(page.invocations.every((invocation) => invocation.runId === runId));
+      const byThread = new Map<string, number>();
+      for (const invocation of page.invocations) {
+        byThread.set(invocation.threadId, (byThread.get(invocation.threadId) ?? 0) + 1);
+      }
+      assert.equal(byThread.get(threadId), 2);
+      assert.deepEqual(
+        [...byThread.values()].toSorted((left, right) => left - right),
+        [1, 2, 2],
+      );
+      const childThreads = [...byThread.keys()].filter((id) => id !== threadId);
+      for (const child of childThreads) {
+        const childOwn = yield* orchestrator.getSkillStatistics({
+          threadId: ThreadId.make(child),
+          scope: "own",
+        });
+        assert.equal(childOwn.total, byThread.get(child));
+        if (childOwn.total === 2) {
+          assert.equal(childOwn.nativeTurns.length, 2);
+          assert.equal(childOwn.threads[0]?.latestNativeTurnCount, 0);
+          assert.equal(childOwn.threads[0]?.beforeLatestNativeTurnCount, 2);
+          assert.deepEqual(childOwn.threads[0]?.activeNativeTurnIds, []);
+          const firstTurn = childOwn.nativeTurns[0]!.providerTurnId;
+          assert.equal(
+            (yield* orchestrator.getSkillStatistics({
+              threadId: ThreadId.make(child),
+              providerTurnId: firstTurn,
+            })).total,
+            2,
+          );
+          assert.equal(
+            (yield* orchestrator.getSkillStatistics({
+              threadId: ThreadId.make(child),
+              providerTurnId: firstTurn,
+              scope: "inclusive",
+            })).total,
+            3,
+          );
+        }
+      }
+      assert.deepEqual(
+        inclusive.executors
+          .map((executor) => [executor.role, executor.origin, executor.total] as const)
+          .toSorted((left, right) => left[2] - right[2] || left[0].localeCompare(right[0])),
+        [
+          ["descendant", "provider_native", 1],
+          ["descendant", "provider_native", 2],
+          ["self", "root", 2],
+        ],
+      );
+      assert.isNull((yield* Ref.get(driver.state)).failure);
+    }).pipe(
+      Effect.provide(
+        ProviderReplayHarness.layerWithRegistry(
+          { name: "skill-children", runtimePolicyOverride: { cwd } },
+          CodexAdapterV2Testkit.layer({ transcript, driver, skills: [skill] }),
+          { runEffectWorker: false },
+        ),
+      ),
+    );
+  }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+);
+
 describe("CodexAdapterV2 process exit", () => {
   it.effect.each([
     { exit: "numeric", active: false },
@@ -1505,6 +1871,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
     onUsageLimits?: CodexAdapterV2.CodexAdapterV2Options["onUsageLimits"],
     promptSuggestions: Effect.Effect<boolean> = Effect.succeed(false),
     onNotification: (method: string) => Effect.Effect<void> = () => Effect.void,
+    skills: ReadonlyArray<CodexSchema.V2SkillsListResponse__SkillMetadata> = [],
   ) =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -1533,7 +1900,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             Effect.flatMap((context) =>
               Effect.service(CodexClient.CodexAppServerClient).pipe(
                 Effect.map((client) =>
-                  withCodexReplayChildMetadata(client, transcript, readChildMetadata),
+                  withCodexReplayChildMetadata(client, transcript, readChildMetadata, skills),
                 ),
                 Effect.map(
                   (client) =>
@@ -8621,87 +8988,147 @@ describe("CodexAdapterV2 post-settle continuation", () => {
     ),
   );
 
-  it.effect("leaves a late child's result to the root's next turn when one is running", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const secondPrompt = "Wait for the sub-agent.";
-        const secondTurn = "native-codex-resume-root-turn-2";
-        const { spawned, rootFinished } = lateChildPrefix();
-        // Reuse the preamble's turn/start exchange under the session's next request id.
-        const secondTurnStart = codexReplayPreamble({
-          nativeThreadId: RESUME_NATIVE_THREAD,
-          nativeTurnId: secondTurn,
-          prompt: secondPrompt,
-        })
-          .slice(-3)
-          .map((entry) =>
-            entry.type !== "runtime_exit" &&
-            typeof entry.frame === "object" &&
-            entry.frame !== null &&
-            "id" in entry.frame
-              ? { ...entry, frame: { ...entry.frame, id: 4 } }
-              : entry,
-          );
-        const harness = yield* makeCodexReplayHarness(
-          makeCodexReplayTranscript({
-            scenario: RESUME_SCENARIO,
-            entries: [
-              ...spawned,
-              ...rootFinished,
-              ...secondTurnStart,
-              childAgentMessage({
-                id: "child-late-answer",
-                text: "CHILD_DURING_SECOND_TURN",
-                turnId: RESUME_CHILD_TURN_1,
-                completedAtMs: 1782622480000,
-              }),
-              childTurnCompleted(RESUME_CHILD_TURN_1),
-              {
-                type: "emit_inbound",
-                label: "turn/completed/root-2",
-                frame: {
-                  method: "turn/completed",
-                  params: {
-                    threadId: RESUME_NATIVE_THREAD,
-                    turn: makeCodexReplayTurn({ id: secondTurn, status: "completed" }),
-                  },
+  it.effect(
+    "leaves a late child's result to the root's next turn but preserves skill ownership",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const secondPrompt = "Wait for the sub-agent.";
+          const secondTurn = "native-codex-resume-root-turn-2";
+          const skillRead = (turnId: string): CodexReplay.CodexAppServerReplayEntry => ({
+            type: "emit_inbound",
+            frame: {
+              method: "item/completed",
+              params: {
+                threadId: RESUME_CHILD_THREAD,
+                turnId,
+                item: {
+                  type: "commandExecution",
+                  id: `skill-${turnId}`,
+                  command: "cat /skills/review/SKILL.md",
+                  cwd: "/workspace",
+                  processId: null,
+                  status: "completed",
+                  aggregatedOutput: "Review",
+                  exitCode: 0,
+                  durationMs: 1,
+                  commandActions: [],
                 },
               },
-            ],
-          }),
-        );
-
-        const turnInput = (index: number, text: string) =>
-          Effect.gen(function* () {
-            return {
-              ...makeCodexTestTurnInput({
-                threadId: harness.threadId,
-                providerThread: harness.providerThread,
-                now: yield* DateTime.now,
-                attemptId: RunAttemptId.make(`attempt-codex-active-root-${index}`),
-                text,
-              }),
-              runOrdinal: index,
-              providerTurnOrdinal: index,
-            };
+            },
           });
-        yield* harness.runtime.startTurn(yield* turnInput(1, RESUME_PROMPT));
-        yield* harness.awaitTerminal(1);
-        yield* harness.runtime.startTurn(yield* turnInput(2, secondPrompt));
-        yield* harness.awaitTerminal(2);
-        assert.equal(harness.subagentUpdates().at(-1)?.subagent.result, "CHILD_DURING_SECOND_TURN");
-        assert.lengthOf(harness.continuationRequests, 0);
-      }).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            IdAllocator.layer,
-            McpProviderSessions.layer,
-            NodeServices.layer,
-            NodeCrypto.layer,
+          const { spawned, rootFinished } = lateChildPrefix();
+          // Reuse the preamble's turn/start exchange under the session's next request id.
+          const secondTurnStart = codexReplayPreamble({
+            nativeThreadId: RESUME_NATIVE_THREAD,
+            nativeTurnId: secondTurn,
+            prompt: secondPrompt,
+          })
+            .slice(-3)
+            .map((entry) =>
+              entry.type !== "runtime_exit" &&
+              typeof entry.frame === "object" &&
+              entry.frame !== null &&
+              "id" in entry.frame
+                ? { ...entry, frame: { ...entry.frame, id: 4 } }
+                : entry,
+            );
+          const harness = yield* makeCodexReplayHarness(
+            makeCodexReplayTranscript({
+              scenario: RESUME_SCENARIO,
+              entries: [
+                ...spawned,
+                ...rootFinished,
+                ...secondTurnStart,
+                childTurnStarted(RESUME_CHILD_TURN_2),
+                skillRead(RESUME_CHILD_TURN_1),
+                skillRead(RESUME_CHILD_TURN_2),
+                childAgentMessage({
+                  id: "child-late-answer",
+                  text: "CHILD_DURING_SECOND_TURN",
+                  turnId: RESUME_CHILD_TURN_1,
+                  completedAtMs: 1782622480000,
+                }),
+                childTurnCompleted(RESUME_CHILD_TURN_1),
+                childTurnCompleted(RESUME_CHILD_TURN_2),
+                {
+                  type: "emit_inbound",
+                  label: "turn/completed/root-2",
+                  frame: {
+                    method: "turn/completed",
+                    params: {
+                      threadId: RESUME_NATIVE_THREAD,
+                      turn: makeCodexReplayTurn({ id: secondTurn, status: "completed" }),
+                    },
+                  },
+                },
+              ],
+            }),
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            [
+              {
+                name: "review",
+                path: "/skills/review/SKILL.md",
+                scope: "user",
+                description: "Review",
+                enabled: true,
+              },
+            ],
+          );
+
+          const turnInput = (index: number, text: string) =>
+            Effect.gen(function* () {
+              return {
+                ...makeCodexTestTurnInput({
+                  threadId: harness.threadId,
+                  providerThread: harness.providerThread,
+                  now: yield* DateTime.now,
+                  attemptId: RunAttemptId.make(`attempt-codex-active-root-${index}`),
+                  text,
+                }),
+                runOrdinal: index,
+                providerTurnOrdinal: index,
+              };
+            });
+          yield* harness.runtime.startTurn(yield* turnInput(1, RESUME_PROMPT));
+          yield* harness.awaitTerminal(1);
+          yield* harness.runtime.startTurn(yield* turnInput(2, secondPrompt));
+          yield* harness.awaitTerminal(2);
+          assert.equal(
+            harness.subagentUpdates().at(-1)?.subagent.result,
+            "CHILD_DURING_SECOND_TURN",
+          );
+          const skills = harness.events.filter(
+            (event) => event.type === "skill_invocation.observed",
+          );
+          assert.deepEqual(
+            skills.map((event) => event.invocation.runId),
+            [
+              RunId.make("run-attempt-codex-active-root-1"),
+              RunId.make("run-attempt-codex-active-root-2"),
+            ],
+          );
+          assert.deepEqual(
+            skills.map((event) => event.invocation.nativeAncestry?.[0]?.runId),
+            skills.map((event) => event.invocation.runId),
+          );
+          assert.lengthOf(harness.continuationRequests, 0);
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              IdAllocator.layer,
+              McpProviderSessions.layer,
+              NodeServices.layer,
+              NodeCrypto.layer,
+            ),
           ),
         ),
       ),
-    ),
   );
 
   it.effect.each(["model/rerouted"] as const)(
