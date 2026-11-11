@@ -267,6 +267,8 @@ export function applyOrchestrationV2ProjectionEvent(
   const latestLocalTurnOrdinal = options?.latestLocalTurnOrdinal;
   const base = { ...projection, updatedAt: event.occurredAt };
   switch (event.type) {
+    case "skill-invocation.observed":
+      return base;
     case "thread.pull-request-link-updated":
       return {
         ...base,

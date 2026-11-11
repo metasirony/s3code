@@ -415,6 +415,8 @@ export function routeProviderEvent(
         (event.providerThread.appThreadId !== null && ownsThread(event.providerThread.appThreadId));
       return belongs ? [true, addProviderThread(event.providerThread.id)] : [false, state];
     }
+    case "skill_invocation.observed":
+      return [event.invocation.runId === input.runId, state];
     case "provider_turn.updated": {
       const isRoot = event.providerTurn.runAttemptId === input.attemptId;
       const belongs =

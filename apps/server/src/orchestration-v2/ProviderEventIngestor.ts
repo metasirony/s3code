@@ -569,6 +569,15 @@ export const layer: Layer.Layer<
                   nodeId: input.event.message.nodeId,
                 }),
               ];
+            case "skill_invocation.observed":
+              return [
+                yield* makeDomainEvent(input, {
+                  type: "skill-invocation.observed",
+                  threadId: input.event.invocation.threadId,
+                  runId: input.event.invocation.runId,
+                  payload: input.event.invocation,
+                }),
+              ];
             case "turn_item.updated":
               return [
                 yield* makeDomainEvent(input, {

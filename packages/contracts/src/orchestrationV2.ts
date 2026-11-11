@@ -1,3 +1,10 @@
+import {
+  SkillInvocation,
+  GetSkillStatisticsInput,
+  SkillStatistics,
+  GetSkillInvocationsInput,
+  SkillInvocationsPage,
+} from "./skillStatistics.ts";
 import { OrchestrationMessageContext } from "./composerContext.ts";
 import { withRecordIdTable } from "./orchestrationV2IdTable.ts";
 import * as DateTime from "effect/DateTime";
@@ -1911,6 +1918,11 @@ const OrchestrationV2EventBase = Schema.Struct({
 export const OrchestrationV2DomainEvent = Schema.Union([
   Schema.Struct({
     ...OrchestrationV2EventBase.fields,
+    type: Schema.Literal("skill-invocation.observed"),
+    payload: SkillInvocation,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2EventBase.fields,
     type: Schema.Literal("thread.created"),
     payload: OrchestrationV2AppThread,
   }),
@@ -2809,6 +2821,11 @@ const OrchestrationV2JsonEventBaseFields = {
 export const OrchestrationV2DomainEventJson = Schema.Union([
   Schema.Struct({
     ...OrchestrationV2JsonEventBaseFields,
+    type: Schema.Literal("skill-invocation.observed"),
+    payload: SkillInvocation,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2JsonEventBaseFields,
     type: Schema.Literal("thread.created"),
     payload: OrchestrationV2AppThreadJson,
   }),
@@ -3659,6 +3676,8 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   getNativeChildWork: "orchestration.getNativeChildWork",
   stopWorkflow: "orchestration.stopWorkflow",
   forceStopThread: "orchestration.forceStopThread",
+  getSkillStatistics: "orchestration.getSkillStatistics",
+  getSkillInvocations: "orchestration.getSkillInvocations",
   getTurnItem: "orchestration.getTurnItem",
   launchThread: "orchestration.launchThread",
   subscribeShell: "orchestration.subscribeShell",
@@ -4363,6 +4382,8 @@ export const OrchestrationV2RpcSchemas = {
     input: OrchestrationV2GetNativeChildWorkInput,
     output: OrchestrationV2GetNativeChildWorkResult,
   },
+  getSkillStatistics: { input: GetSkillStatisticsInput, output: SkillStatistics },
+  getSkillInvocations: { input: GetSkillInvocationsInput, output: SkillInvocationsPage },
   getTurnItem: {
     input: OrchestrationV2GetTurnItemInput,
     output: OrchestrationV2GetTurnItemResult,

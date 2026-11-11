@@ -1,3 +1,9 @@
+import * as NodeOS from "node:os";
+import {
+  observedCodexSkillReads,
+  requestedCodexSkills,
+  skillIdentity,
+} from "../../provider/CodexSkillInvocations.ts";
 import { pipe } from "effect/Function";
 import * as DocumentText from "../../provider/DocumentText.ts";
 import { revertCodexThread } from "../../provider/CodexThreadRevert.ts";
@@ -156,6 +162,9 @@ import {
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 
+const encodeSkillObservationId = Schema.encodeEffect(
+  Schema.fromJsonString(Schema.Array(Schema.String)),
+);
 const CODEX_PROVIDER = ProviderDriverKind.make("codex");
 const CODEX_CAPACITY_MAX_RETRIES = 5;
 // Codex can announce a retry and never resume. Recovered retries resume model output within ~75s.
@@ -1791,6 +1800,17 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           settings: resolvedRuntime?.config ?? adapterOptions.settings,
           environment: resolvedRuntime?.environment ?? adapterOptions.environment,
         });
+        let skillCatalog: ReadonlyArray<CodexSchema.V2SkillsListResponse__SkillMetadata> = [];
+        const refreshSkillCatalog = Effect.fn("CodexAdapterV2.refreshSkillCatalog")(function* () {
+          const result = yield* client.raw
+            .request("skills/list", { cwds: [input.runtimePolicy.cwd ?? process.cwd()] })
+            .pipe(
+              Effect.flatMap(Schema.decodeUnknownEffect(CodexSchema.V2SkillsListResponse)),
+              Effect.timeout("5 seconds"),
+              Effect.orElseSucceed(() => null),
+            );
+          if (result !== null) skillCatalog = result.data.flatMap((entry) => entry.skills);
+        });
         const additionalContextByThread = yield* Ref.make(
           new Map<
             string,
@@ -1874,6 +1894,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             }
             yield* client.notify("initialized", undefined);
             yield* Ref.set(initialized, true);
+            yield* refreshSkillCatalog();
           }),
         );
         // A failed open is discarded, so the next turn spawns the updated binary.
@@ -3471,13 +3492,47 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
         );
 
         const toCodexInput = Effect.fn("CodexAdapterV2.toCodexInput")(function* (
-          turnInput: Pick<
+          turnInput:
             | ProviderAdapter.ProviderAdapterV2TurnInput
             | ProviderAdapter.ProviderAdapterV2SteerInput,
-            "message"
-          >,
         ) {
+          yield* ensureInitialized;
+          yield* refreshSkillCatalog();
           const inputItems: Array<CodexSchema.V2TurnStartParams__UserInput> = [];
+          const selectedSkills =
+            turnInput.message.createdBy === "user"
+              ? requestedCodexSkills(codexSkillMentionText(turnInput.message.text), skillCatalog)
+              : [];
+          for (const selected of selectedSkills) {
+            inputItems.push({ type: "skill", name: selected.name, path: selected.path });
+            const skill = skillIdentity(
+              selected,
+              input.runtimePolicy.cwd ?? process.cwd(),
+              NodeOS.homedir(),
+            );
+            yield* emitProviderEvent({
+              type: "skill_invocation.observed",
+              driver: CODEX_PROVIDER,
+              invocation: {
+                id: yield* encodeSkillObservationId([
+                  turnInput.threadId,
+                  turnInput.message.messageId,
+                  "user_requested",
+                  skill.key,
+                ]),
+                threadId: turnInput.threadId,
+                runId: turnInput.runId,
+                providerTurnId: "providerTurnId" in turnInput ? turnInput.providerTurnId : null,
+                messageId: turnInput.message.messageId,
+                turnItemId: null,
+                nativeItemId: null,
+                occurrence: 0,
+                source: "user_requested",
+                skill,
+                observedAt: DateTime.formatIso(yield* DateTime.now),
+              },
+            });
+          }
           const text = yield* providerMessageTextWithAttachmentPaths({
             text: codexSkillMentionText(turnInput.message.text),
             attachments: turnInput.message.attachments,
@@ -5323,6 +5378,33 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               if (context.closedCommandItemIds?.has(payload.item.id)) return;
               const turnDrained = yield* clearRunningCommandItem(payload.turnId, payload.item.id);
               const artifacts = yield* buildCommandExecutionArtifacts(context, payload.item);
+              if (context.projectionRunId !== null) {
+                const reads = observedCodexSkillReads(payload.item, skillCatalog, NodeOS.homedir());
+                for (const [occurrence, skill] of reads.entries()) {
+                  yield* emitProviderEvent({
+                    type: "skill_invocation.observed",
+                    driver: CODEX_PROVIDER,
+                    invocation: {
+                      id: yield* encodeSkillObservationId([
+                        context.projectionThreadId,
+                        payload.turnId,
+                        payload.item.id,
+                        String(occurrence),
+                      ]),
+                      threadId: context.projectionThreadId,
+                      runId: context.projectionRunId,
+                      providerTurnId: context.providerTurnId,
+                      messageId: null,
+                      turnItemId: artifacts.turnItem.id,
+                      nativeItemId: payload.item.id,
+                      occurrence,
+                      source: "agent_observed",
+                      skill,
+                      observedAt: DateTime.formatIso(artifacts.turnItem.updatedAt),
+                    },
+                  });
+                }
+              }
               yield* emitProviderEvent({
                 type: "node.updated",
                 driver: CODEX_PROVIDER,

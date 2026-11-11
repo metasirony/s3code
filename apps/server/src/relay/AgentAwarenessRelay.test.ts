@@ -208,6 +208,8 @@ const makeTestRelay = Effect.fnUntraced(function* (
   const shellReads: ThreadId[] = [];
   const catchUp = { activitySnapshotReads: 0 };
   const threads = ThreadManagementService.ThreadManagementService.of({
+    getSkillStatistics: () => Effect.die("Unexpected skill statistics read"),
+    getSkillInvocations: () => Effect.die("Unexpected skill invocation read"),
     getThreadShell: unused,
     getShellSnapshot: unused,
     getAgentAwarenessSnapshot: (threadId) =>

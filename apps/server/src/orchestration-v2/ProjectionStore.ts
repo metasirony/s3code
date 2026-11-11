@@ -1,3 +1,5 @@
+import { SkillInvocation } from "@t3tools/contracts";
+import { makeSkillStatistics } from "./SkillStatistics.ts";
 import type { ProjectThreadAwarenessV2Input } from "@t3tools/shared/agentAwareness";
 import { pendingGuestMessageCount } from "@t3tools/contracts";
 import { applyThreadPullRequestLinkUpdate } from "../sourceControl/threadPullRequests.ts";
@@ -113,6 +115,8 @@ import {
   THREAD_HISTORY_INLINE_WORK_ITEM_LIMIT,
   THREAD_HISTORY_TURN_SNAPSHOT_ROW_LIMIT,
 } from "./threadHistoryPaging.ts";
+
+const encodeSkillInvocation = Schema.encodeEffect(Schema.fromJsonString(SkillInvocation));
 
 export class ProjectionStoreApplyEventError extends Schema.TaggedError<ProjectionStoreApplyEventError>()(
   "ProjectionStoreApplyEventError",
@@ -451,6 +455,8 @@ export interface OlderSettledThreadsListing {
 }
 
 export interface ProjectionStoreV2Shape {
+  readonly getSkillStatistics: Effect.Success<typeof makeSkillStatistics>["getSkillStatistics"];
+  readonly getSkillInvocations: Effect.Success<typeof makeSkillStatistics>["getSkillInvocations"];
   readonly searchThreadStream: (
     input: OrchestrationV2SearchThreadInput,
   ) => Stream.Stream<OrchestrationV2SearchThreadResult, ProjectionStoreV2Error>;
@@ -985,6 +991,8 @@ export function applyToProjection(
         ...base,
         messages: upsertById(base.messages, event.payload),
       };
+    case "skill-invocation.observed":
+      return base;
     case "turn-item.updated":
       return withLocalVisibleTurnItems({
         ...base,
@@ -2076,6 +2084,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
   ProjectionStoreV2,
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
+    const skillStatistics = yield* makeSkillStatistics;
 
     const inlineWorkOutput = sql`item.type = 'dynamic_tool' AND (
       item.payload_json LIKE '%htmlRender%' OR item.payload_json LIKE ${`%${MCP_APP_OUTPUT_KEY}%`}
@@ -2789,6 +2798,15 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 status = excluded.status,
                 payload_json = excluded.payload_json
             `;
+              break;
+            }
+            case "skill-invocation.observed": {
+              const invocation = event.payload;
+              const payloadJson = yield* encodeSkillInvocation(invocation);
+              yield* sql`INSERT INTO orchestration_v2_skill_invocations
+                (invocation_id, thread_id, run_id, skill_key, source, payload_json)
+                VALUES (${invocation.id}, ${invocation.threadId}, ${invocation.runId}, ${invocation.skill.key}, ${invocation.source}, ${payloadJson})
+                ON CONFLICT(invocation_id) DO NOTHING`;
               break;
             }
             case "turn-item.updated": {
@@ -8043,6 +8061,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       listAppOwnedChildThreadIds: readOnReader(listAppOwnedChildThreadIds),
       hasPendingDelegatedCompletion: readOnReader(hasPendingDelegatedCompletion),
       getNextTurnItemOrdinal: readOnReader(getNextTurnItemOrdinal),
+      getSkillStatistics: readOnReader(skillStatistics.getSkillStatistics),
+      getSkillInvocations: readOnReader(skillStatistics.getSkillInvocations),
       getTurnItem: readOnReader(getTurnItem),
       getMessagesById: readOnReader(getMessagesById),
       getThreadRecords: (threadId, fields, filter) =>

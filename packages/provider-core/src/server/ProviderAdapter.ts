@@ -1,3 +1,4 @@
+import { SkillInvocation } from "@t3tools/contracts";
 import type { OrchestrationV2HistoricalMessage } from "@t3tools/contracts";
 import {
   ChatAttachment,
@@ -81,6 +82,11 @@ export const ProviderAdapterV2SessionStatus = Schema.Literals([
 export type ProviderAdapterV2SessionStatus = typeof ProviderAdapterV2SessionStatus.Type;
 
 export const ProviderAdapterV2Event = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("skill_invocation.observed"),
+    driver: ProviderDriverKind,
+    invocation: SkillInvocation,
+  }),
   Schema.Struct({
     type: Schema.Literal("app_thread.created"),
     driver: ProviderDriverKind,

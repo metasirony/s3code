@@ -46,6 +46,9 @@ import * as Statement from "effect/sql/Statement";
 import { projectThreadAwarenessV2 } from "@t3tools/shared/agentAwareness";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import {
@@ -2824,6 +2827,246 @@ it.effect("lists every thread in the shell snapshot past SQLite's bound variable
     assert.strictEqual(unscoped.threads.length, threadCount);
     assert.strictEqual(active.threads.length, threadCount);
   }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect(
+  "persists skill observations idempotently and aggregates empty, active and rolled-back runs",
+  () =>
+    Effect.gen(function* () {
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const threadId = yield* addRolledBackRecoveryCandidate("skills");
+      const projection = yield* store.getThreadProjection(threadId);
+      const template = projection.runs[0]!;
+      const now = projection.updatedAt;
+      const runs = [1, 2, 3].map((ordinal) => ({
+        ...template,
+        id: RunId.make(`skills:${ordinal}`),
+        ordinal: ordinal + 1,
+        status: "completed" as const,
+      }));
+      for (const run of runs)
+        yield* store.apply({
+          id: EventId.make(`skills:run:${run.id}`),
+          type: "run.created",
+          threadId,
+          occurredAt: now,
+          payload: run,
+        });
+      const skill = {
+        key: "user:/skills/review/SKILL.md",
+        name: "review",
+        path: "/skills/review/SKILL.md",
+        scope: "user",
+        pluginId: null,
+      };
+      const observations = [
+        { run: runs[0]!, skill, source: "user_requested" as const },
+        { run: runs[0]!, skill, source: "agent_observed" as const },
+        { run: runs[0]!, skill, source: "agent_observed" as const },
+        { run: runs[1]!, skill, source: "agent_observed" as const },
+        {
+          run: runs[1]!,
+          skill: {
+            ...skill,
+            key: "plugin:/plugins/review/SKILL.md",
+            path: "/plugins/review/SKILL.md",
+            pluginId: "plugin",
+          },
+          source: "agent_observed" as const,
+        },
+      ];
+      for (const [index, observation] of observations.entries()) {
+        const event = {
+          id: EventId.make(`skills:event:${index}`),
+          type: "skill-invocation.observed" as const,
+          threadId,
+          occurredAt: now,
+          payload: {
+            id: `skills:invocation:${index}`,
+            threadId,
+            runId: observation.run.id,
+            providerTurnId: ProviderTurnId.make(`native:${observation.run.id}`),
+            messageId: null,
+            turnItemId: TurnItemId.make(`item:${index}`),
+            nativeItemId: `native-item:${index}`,
+            occurrence: index,
+            source: observation.source,
+            skill: observation.skill,
+            observedAt: DateTime.formatIso(now),
+          },
+        };
+        yield* store.apply(event);
+        yield* store.apply({ ...event, id: EventId.make(`skills:redelivery:${index}`) });
+      }
+      const stats = yield* store.getSkillStatistics({ threadId });
+      assert.equal(stats.total, 5);
+      assert.equal(stats.userRequested, 1);
+      assert.deepEqual(
+        stats.runs.map((run) => run.total),
+        [3, 2, 0],
+      );
+      assert.deepEqual(stats.skills.map((entry) => entry.total).sort(), [1, 4]);
+      assert.equal(stats.threads[0]?.latestRunId, runs[2]!.id);
+      assert.equal(stats.threads[0]?.latestRunCount, 0);
+      assert.equal(stats.threads[0]?.beforeLatestRunCount, 5);
+      const page = yield* store.getSkillInvocations({ threadId, limit: 2 });
+      assert.equal(page.invocations.length, 2);
+      assert.isNotNull(page.nextCursor);
+      assert.equal(
+        (yield* store.getSkillInvocations({ threadId, after: page.nextCursor!, limit: 10 }))
+          .invocations.length,
+        3,
+      );
+      assert.equal((yield* store.getSkillStatistics({ threadId, runId: runs[1]!.id })).total, 2);
+      const reopened = yield* Effect.service(ProjectionStore.ProjectionStoreV2).pipe(
+        Effect.provide(ProjectionStore.layer),
+      );
+      assert.deepEqual(yield* reopened.getSkillStatistics({ threadId }), stats);
+      yield* store.apply({
+        id: EventId.make("skills:active"),
+        type: "run.updated",
+        threadId,
+        occurredAt: now,
+        payload: { ...runs[2]!, status: "running", completedAt: null },
+      });
+      assert.deepEqual((yield* store.getSkillStatistics({ threadId })).threads[0]?.activeRunIds, [
+        runs[2]!.id,
+      ]);
+      yield* store.apply({
+        id: EventId.make("skills:rollback-empty"),
+        type: "run.updated",
+        threadId,
+        occurredAt: now,
+        payload: { ...runs[2]!, status: "rolled_back" },
+      });
+      yield* store.apply({
+        id: EventId.make("skills:rollback"),
+        type: "run.updated",
+        threadId,
+        occurredAt: now,
+        payload: { ...runs[1]!, status: "rolled_back" },
+      });
+      const rolledBack = yield* store.getSkillStatistics({ threadId });
+      assert.equal(rolledBack.total, 3);
+      assert.equal(rolledBack.threads[0]?.latestRunId, runs[0]!.id);
+      assert.equal((yield* store.getSkillStatistics({})).total, 3);
+      const otherThreadId = yield* addRolledBackRecoveryCandidate("skills-other");
+      const other = yield* store.getThreadProjection(otherThreadId);
+      const otherRun = other.runs[0]!;
+      yield* store.apply({
+        id: EventId.make("skills:other-run"),
+        type: "run.updated",
+        threadId: otherThreadId,
+        occurredAt: now,
+        payload: { ...otherRun, status: "completed" },
+      });
+      yield* store.apply({
+        id: EventId.make("skills:other-observation"),
+        type: "skill-invocation.observed",
+        threadId: otherThreadId,
+        occurredAt: now,
+        payload: {
+          id: "skills:other-observation",
+          threadId: otherThreadId,
+          runId: otherRun.id,
+          providerTurnId: null,
+          messageId: otherRun.userMessageId,
+          turnItemId: null,
+          nativeItemId: null,
+          occurrence: 0,
+          source: "user_requested",
+          skill,
+          observedAt: DateTime.formatIso(now),
+        },
+      });
+      const environment = yield* store.getSkillStatistics({});
+      assert.equal(environment.total, 4);
+      assert.deepEqual(environment.threads.map((thread) => thread.total).sort(), [1, 3]);
+      assert.equal((yield* store.getSkillStatistics({ threadId })).total, 3);
+      assert.deepEqual(
+        (yield* store.getSkillStatistics({ runId: otherRun.id })).threads.map(
+          (thread) => thread.threadId,
+        ),
+        [otherThreadId],
+      );
+      yield* store.apply({
+        id: EventId.make("skills:deleted"),
+        type: "thread.deleted",
+        threadId,
+        occurredAt: now,
+        payload: { ...projection.thread, deletedAt: now },
+      });
+      assert.equal((yield* store.getSkillStatistics({})).total, 1);
+      assert.deepEqual((yield* store.getSkillInvocations({ threadId })).invocations, []);
+    }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("keeps skill totals and the last empty run after closing and reopening SQLite", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-skill-restart-" });
+    const database = SqlitePersistence.layerFromPath(path.join(directory, "state.sqlite"));
+    const layer = ProjectionStore.layer.pipe(Layer.provide(database));
+    const threadId = yield* Effect.gen(function* () {
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const id = yield* addRolledBackRecoveryCandidate("skill-restart");
+      const projection = yield* store.getThreadProjection(id);
+      const run = projection.runs[0]!;
+      yield* store.apply({
+        id: EventId.make("restart:run"),
+        type: "run.updated",
+        threadId: id,
+        occurredAt: projection.updatedAt,
+        payload: { ...run, status: "completed" },
+      });
+      yield* store.apply({
+        id: EventId.make("restart:skill"),
+        type: "skill-invocation.observed",
+        threadId: id,
+        occurredAt: projection.updatedAt,
+        payload: {
+          id: "restart:invocation",
+          threadId: id,
+          runId: run.id,
+          providerTurnId: null,
+          messageId: run.userMessageId,
+          turnItemId: null,
+          nativeItemId: null,
+          occurrence: 0,
+          source: "user_requested",
+          skill: {
+            key: "skill:restart",
+            name: "review",
+            path: "/skills/review/SKILL.md",
+            scope: "repo",
+            pluginId: null,
+          },
+          observedAt: DateTime.formatIso(projection.updatedAt),
+        },
+      });
+      yield* store.apply({
+        id: EventId.make("restart:empty"),
+        type: "run.created",
+        threadId: id,
+        occurredAt: projection.updatedAt,
+        payload: { ...run, id: RunId.make("restart:empty-run"), ordinal: 2, status: "completed" },
+      });
+      return id;
+    }).pipe(Effect.provide(layer), Effect.scoped);
+    yield* Effect.gen(function* () {
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const stats = yield* store.getSkillStatistics({ threadId });
+      assert.equal(stats.total, 1);
+      assert.equal(stats.threads[0]?.latestRunId, "restart:empty-run");
+      assert.equal(stats.threads[0]?.latestRunCount, 0);
+      assert.equal(stats.threads[0]?.beforeLatestRunCount, 1);
+      assert.equal(
+        (yield* store.getSkillInvocations({ threadId })).invocations[0]?.id,
+        "restart:invocation",
+      );
+    }).pipe(Effect.provide(Layer.fresh(layer)), Effect.scoped);
+  }).pipe(Effect.provide(NodeServices.layer)),
 );
 
 it.layer(layerTest)("ProjectionStoreV2", (it) => {

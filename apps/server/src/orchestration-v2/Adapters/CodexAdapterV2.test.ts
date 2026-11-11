@@ -796,6 +796,198 @@ function withReplayRequestId(
     : entry;
 }
 
+it.effect(
+  "persists Codex skill selections, steer selections and repeated reads through orchestration",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-skill-statistics-" });
+      const nativeThreadId = "skills-native-thread";
+      const nativeTurnId = "skills-native-turn";
+      const prompt = "$review $review";
+      const skill = {
+        name: "review",
+        path: "/skills/review/SKILL.md",
+        scope: "user" as const,
+        description: "Review",
+        enabled: true,
+      };
+      const selectedInput = [
+        { type: "skill", name: skill.name, path: skill.path },
+        { type: "text", text: prompt },
+      ];
+      const preamble = codexReplayPreamble({ nativeThreadId, nativeTurnId, prompt }).map(
+        (entry) => {
+          if (
+            entry.type !== "expect_outbound" ||
+            !Predicate.isObject(entry.frame) ||
+            entry.frame.method !== "turn/start" ||
+            !Predicate.isObject(entry.frame.params)
+          )
+            return entry;
+          return {
+            ...entry,
+            frame: { ...entry.frame, params: { ...entry.frame.params, input: selectedInput } },
+          };
+        },
+      );
+      const read: CodexReplay.CodexAppServerReplayEntry = {
+        type: "emit_inbound",
+        frame: {
+          method: "item/completed",
+          params: {
+            threadId: nativeThreadId,
+            turnId: nativeTurnId,
+            completedAtMs: 1782622440000,
+            item: {
+              type: "commandExecution",
+              id: "skill-read",
+              command: "cat /skills/review/SKILL.md && cat /skills/review/SKILL.md",
+              cwd: "/workspace",
+              processId: null,
+              status: "completed",
+              aggregatedOutput: "Review instructions",
+              exitCode: 0,
+              durationMs: 1,
+              commandActions: [
+                {
+                  type: "read",
+                  command: "cat /skills/review/SKILL.md",
+                  name: "SKILL.md",
+                  path: skill.path,
+                },
+              ],
+            },
+          },
+        },
+      };
+      const transcript = yield* decodeReplayTranscriptJson(
+        (yield* encodeReplayTranscriptJson(
+          makeCodexReplayTranscript({
+            scenario: "skill-statistics",
+            entries: [
+              ...preamble,
+              read,
+              read,
+              {
+                type: "expect_outbound",
+                frame: {
+                  id: 4,
+                  method: "turn/steer",
+                  params: {
+                    threadId: nativeThreadId,
+                    expectedTurnId: nativeTurnId,
+                    input: selectedInput,
+                  },
+                },
+              },
+              { type: "emit_inbound", frame: { id: 4, result: { turnId: nativeTurnId } } },
+              {
+                type: "emit_inbound",
+                frame: {
+                  method: "turn/completed",
+                  params: {
+                    threadId: nativeThreadId,
+                    turn: makeCodexReplayTurn({ id: nativeTurnId, status: "completed" }),
+                  },
+                },
+              },
+            ],
+          }),
+        )).replaceAll(yield* encodeStringJson("/workspace"), yield* encodeStringJson(cwd)),
+      );
+      const driver = yield* CodexReplay.makeReplayDriver(transcript);
+      yield* Effect.gen(function* () {
+        const orchestrator = yield* Orchestrator.OrchestratorV2;
+        const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+        const threadId = ThreadId.make("thread:skills");
+        yield* orchestrator.dispatch({
+          type: "thread.create",
+          commandId: CommandId.make("create-skills"),
+          threadId,
+          projectId: ProjectId.make("project:skills"),
+          title: "Skills",
+          modelSelection: CODEX_TEST_MODEL_SELECTION,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: cwd,
+          createdBy: "user",
+          creationSource: "web",
+        });
+        const readCommitted = yield* orchestrator.streamDomainEvents.pipe(
+          Stream.filter(
+            (event) =>
+              event.type === "turn-item.updated" && event.payload.type === "command_execution",
+          ),
+          Stream.runHead,
+          Effect.forkChild({ startImmediately: true }),
+        );
+        yield* orchestrator.dispatch({
+          type: "message.dispatch",
+          commandId: CommandId.make("start-skills"),
+          threadId,
+          messageId: MessageId.make("message:skills"),
+          text: prompt,
+          attachments: [],
+          createdBy: "user",
+          creationSource: "web",
+          dispatchMode: { type: "start_immediately" },
+        });
+        yield* worker.drain();
+        yield* Fiber.join(readCommitted);
+        const first = yield* orchestrator.getSkillStatistics({ threadId });
+        assert.equal(first.total, 3);
+        assert.equal(first.userRequested, 1);
+        assert.equal(first.agentObserved, 2);
+        const runId = first.threads[0]!.latestRunId!;
+        const completed = yield* orchestrator.streamDomainEvents.pipe(
+          Stream.filter(
+            (event) =>
+              event.type === "provider-turn.updated" && event.payload.status === "completed",
+          ),
+          Stream.runHead,
+          Effect.forkChild({ startImmediately: true }),
+        );
+        yield* orchestrator.dispatch({
+          type: "message.dispatch",
+          commandId: CommandId.make("steer-skills"),
+          threadId,
+          messageId: MessageId.make("message:skills-steer"),
+          text: prompt,
+          attachments: [],
+          createdBy: "user",
+          creationSource: "web",
+          dispatchMode: { type: "steer_active", targetRunId: runId },
+        });
+        yield* worker.drain();
+        yield* Fiber.join(completed);
+        yield* worker.drain();
+        const stats = yield* orchestrator.getSkillStatistics({ threadId });
+        assert.equal(stats.total, 4);
+        assert.equal(stats.userRequested, 2);
+        assert.equal(stats.runs[0]?.total, 4);
+        const page = yield* orchestrator.getSkillInvocations({ threadId });
+        assert.deepEqual(
+          page.invocations
+            .filter((invocation) => invocation.source === "user_requested")
+            .map((invocation) => invocation.messageId),
+          [MessageId.make("message:skills"), MessageId.make("message:skills-steer")],
+        );
+        assert.isTrue(page.invocations.every((invocation) => invocation.runId === runId));
+        assert.isNull((yield* Ref.get(driver.state)).failure);
+      }).pipe(
+        Effect.provide(
+          ProviderReplayHarness.layerWithRegistry(
+            { name: "skill-statistics", runtimePolicyOverride: { cwd } },
+            CodexAdapterV2Testkit.layer({ transcript, driver, skills: [skill] }),
+            { runEffectWorker: false },
+          ),
+        ),
+      );
+    }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+);
+
 describe("CodexAdapterV2 process exit", () => {
   it.effect.each([
     { exit: "numeric", active: false },
@@ -861,7 +1053,15 @@ describe("CodexAdapterV2 process exit", () => {
         instanceId: CodexAdapterV2.CODEX_DEFAULT_INSTANCE_ID,
         settings: DEFAULT_CODEX_SETTINGS,
         environment: {},
-        clientFactory: { open: () => Effect.succeed(client) },
+        clientFactory: {
+          open: () =>
+            Effect.succeed(
+              withCodexReplayChildMetadata(
+                client,
+                makeCodexReplayTranscript({ scenario, entries: [] }),
+              ),
+            ),
+        },
         digest: yield* Digest.Digest,
         fileSystem: yield* FileSystem.FileSystem,
         idAllocator: yield* IdAllocator.IdAllocatorV2,
@@ -1039,7 +1239,10 @@ describe("CodexAdapterV2 session initialize", () => {
               Effect.map(
                 (client) =>
                   ({
-                    ...client,
+                    ...withCodexReplayChildMetadata(
+                      client,
+                      makeCodexReplayTranscript({ scenario: "initialize", entries: [] }),
+                    ),
                     request: (method, params) =>
                       Effect.sync(() => {
                         if (method === "initialize") initializeRequests++;

@@ -105,6 +105,7 @@ function shouldPublishAgentAwarenessEvent(
     case "provider-thread.updated":
       return true;
     // Unsettling must not re-alert a dismissed result.
+    case "skill-invocation.observed":
     case "thread.unsettled":
     case "thread.guest-share-updated":
     case "thread.snoozed":

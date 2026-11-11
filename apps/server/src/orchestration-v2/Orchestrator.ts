@@ -432,6 +432,8 @@ export interface OrchestratorV2Shape {
     threadId: ThreadId,
     limit: number,
   ) => Effect.Effect<number, OrchestratorV2Error>;
+  readonly getSkillStatistics: ProjectionStoreV2["Service"]["getSkillStatistics"];
+  readonly getSkillInvocations: ProjectionStoreV2["Service"]["getSkillInvocations"];
   readonly getTurnItem: (input: {
     readonly threadId: ThreadId;
     readonly itemId: TurnItemId;
@@ -15429,6 +15431,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })));
       },
     ),
+    getSkillStatistics: projectionStore.getSkillStatistics,
+    getSkillInvocations: projectionStore.getSkillInvocations,
     getTurnItem: Effect.fn("OrchestratorV2.getTurnItem")(function (input) {
       return projectionStore
         .getTurnItem(input)

@@ -2020,6 +2020,10 @@ export const layerWsRpc = (
           readWorkflowScript({ scriptPath: input.scriptPath }),
         [ORCHESTRATION_V2_WS_METHODS.getNativeChildWork]: (input) =>
           nativeChildWork.getNativeChildWork(input),
+        [ORCHESTRATION_V2_WS_METHODS.getSkillStatistics]: (input) =>
+          threadManagement.getSkillStatistics(input),
+        [ORCHESTRATION_V2_WS_METHODS.getSkillInvocations]: (input) =>
+          threadManagement.getSkillInvocations(input),
         [ORCHESTRATION_V2_WS_METHODS.getTurnItem]: (input) =>
           threadManagement.getTurnItem(input).pipe(
             Effect.mapError(

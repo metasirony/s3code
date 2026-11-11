@@ -1,3 +1,4 @@
+import { SkillStatisticsReadError } from "./skillStatistics.ts";
 import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
@@ -1909,6 +1910,16 @@ const WsOrchestrationV2GetNativeChildWorkRpc = Rpc.make(
   },
 );
 
+const WsGetSkillStatisticsRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.getSkillStatistics, {
+  payload: OrchestrationV2RpcSchemas.getSkillStatistics.input,
+  success: OrchestrationV2RpcSchemas.getSkillStatistics.output,
+  error: Schema.Union([SkillStatisticsReadError, EnvironmentAuthorizationError]),
+});
+const WsGetSkillInvocationsRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.getSkillInvocations, {
+  payload: OrchestrationV2RpcSchemas.getSkillInvocations.input,
+  success: OrchestrationV2RpcSchemas.getSkillInvocations.output,
+  error: Schema.Union([SkillStatisticsReadError, EnvironmentAuthorizationError]),
+});
 const WsOrchestrationV2GetTurnItemRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.getTurnItem, {
   payload: OrchestrationV2RpcSchemas.getTurnItem.input,
   success: OrchestrationV2RpcSchemas.getTurnItem.output,
@@ -2282,6 +2293,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2GetNativeChildWorkRpc,
   WsOrchestrationV2StopWorkflowRpc,
   WsOrchestrationV2ForceStopThreadRpc,
+  WsGetSkillStatisticsRpc,
+  WsGetSkillInvocationsRpc,
   WsOrchestrationV2GetTurnItemRpc,
   WsOrchestrationV2GetTurnDiffRpc,
   WsOrchestrationV2GetFullThreadDiffRpc,

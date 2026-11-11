@@ -1,3 +1,4 @@
+import type * as CodexSchema from "effect-codex-app-server/schema";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { CodexSettings, type ProviderReplayTranscript } from "@t3tools/contracts";
@@ -52,6 +53,7 @@ export function withCodexReplayChildMetadata(
     method: "thread/read" | "thread/resume",
   ) => Effect.Effect<unknown, CodexError.CodexAppServerError> = (threadId) =>
     Effect.succeed({ thread: { id: threadId }, model: null }),
+  skills: ReadonlyArray<CodexSchema.V2SkillsListResponse__SkillMetadata> = [],
 ): CodexClient.CodexAppServerClient["Service"] {
   const childThreadIds = new Set(
     transcript.entries.flatMap((entry) => {
@@ -72,13 +74,17 @@ export function withCodexReplayChildMetadata(
     raw: {
       ...client.raw,
       request: (method, params) =>
-        (method === "thread/read" || method === "thread/resume") &&
-        Predicate.isObject(params) &&
-        (method === "thread/read" ? params.includeTurns === false : params.excludeTurns === true) &&
-        typeof params.threadId === "string" &&
-        childThreadIds.has(params.threadId)
-          ? readMetadata(params.threadId, method)
-          : client.raw.request(method, params),
+        method === "skills/list"
+          ? Effect.succeed({ data: [{ cwd: "/workspace", skills, errors: [] }] })
+          : (method === "thread/read" || method === "thread/resume") &&
+              Predicate.isObject(params) &&
+              (method === "thread/read"
+                ? params.includeTurns === false
+                : params.excludeTurns === true) &&
+              typeof params.threadId === "string" &&
+              childThreadIds.has(params.threadId)
+            ? readMetadata(params.threadId, method)
+            : client.raw.request(method, params),
     },
   };
 }
@@ -98,6 +104,7 @@ function metadataFromTranscript(transcript: ProviderReplayTranscript): {
 export function layer(input: {
   readonly transcript: CodexReplay.CodexAppServerReplayTranscript;
   readonly driver?: CodexReplay.CodexAppServerReplayDriver;
+  readonly skills?: ReadonlyArray<CodexSchema.V2SkillsListResponse__SkillMetadata>;
 }) {
   const layerReplay =
     input.driver === undefined
@@ -117,7 +124,9 @@ export function layer(input: {
           ),
         );
         return yield* Effect.service(CodexClient.CodexAppServerClient).pipe(
-          Effect.map((client) => withCodexReplayChildMetadata(client, input.transcript)),
+          Effect.map((client) =>
+            withCodexReplayChildMetadata(client, input.transcript, undefined, input.skills),
+          ),
           Effect.provide(context),
         );
       }),
