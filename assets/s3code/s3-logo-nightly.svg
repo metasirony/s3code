@@ -1,0 +1,83 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="night" x1="12" y1="6" x2="116" y2="124" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07152F"/>
+      <stop offset="0.5" stop-color="#151443"/>
+      <stop offset="1" stop-color="#32155B"/>
+    </linearGradient>
+    <radialGradient id="skyGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(90 28) rotate(137) scale(78 70)">
+      <stop stop-color="#5165D8" stop-opacity="0.4"/>
+      <stop offset="0.5" stop-color="#283075" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#111635" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="horizonGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(42 127) rotate(-70) scale(68 96)">
+      <stop stop-color="#6646B6" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#352066" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="frame">
+      <rect width="128" height="128" rx="10"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="128" height="128" fill="url(#night)"/>
+    <rect width="128" height="128" fill="url(#skyGlow)"/>
+    <rect width="128" height="128" fill="url(#horizonGlow)"/>
+
+
+    <!-- A few tiny stars kept to the perimeter so the wordmark stays clear. -->
+    <g fill="#E4EAFF">
+      <circle cx="17" cy="18" r="0.55" fill-opacity="0.82"/>
+      <circle cx="54" cy="14" r="0.4" fill-opacity="0.65"/>
+      <circle cx="116" cy="42" r="0.45" fill-opacity="0.72"/>
+      <circle cx="10" cy="70" r="0.35" fill-opacity="0.56"/>
+      <circle cx="117" cy="88" r="0.4" fill-opacity="0.6"/>
+    </g>
+    <path d="M31 22V24.8M29.6 23.4H32.4" stroke="#EEF2FF" stroke-width="0.5" stroke-linecap="round" opacity="0.72"/>
+    <path d="M111 58V60M110 59H112" stroke="#CBD8FF" stroke-width="0.45" stroke-linecap="round" opacity="0.58"/>
+
+    <!-- Broad horizon remains below the T3 baseline (y=94). -->
+    <path d="M-12 119C14 99 39 99 63 110C87 121 110 116 140 96V140H-12V119Z" fill="#20184E" fill-opacity="0.42"/>
+    <path d="M-12 129C15 111 42 112 66 122C91 132 114 124 140 107V140H-12V129Z" fill="#6946B8" fill-opacity="0.22"/>
+  </g>
+<g clip-path="url(#frame)"><g transform="translate(25.2953125 97.58259711729615) scale(3.125) translate(-32 -16)">
+  <defs>
+    <linearGradient id="cloud-lower-left.svg-cloud" x1="7" y1="10" x2="57" y2="25" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4EA4FF" stop-opacity="0.62"/>
+      <stop offset="0.52" stop-color="#696FEA" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#A85BEA" stop-opacity="0.58"/>
+    </linearGradient>
+    <radialGradient id="cloud-lower-left.svg-highlight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(30 14) rotate(13) scale(27 10)">
+      <stop stop-color="#C8D7FF" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#8C8EF2" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="cloud-lower-left.svg-soft" x="-8" y="-8" width="80" height="48" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="2.5"/>
+    </filter>
+  </defs>
+
+  <g>
+    <path d="M7 23.5C7 18.9 10.8 15.2 15.5 15.2C16.9 10.7 21.1 7.5 26.1 7.5C31 7.5 35.2 10.5 36.7 14.8C38.5 13.2 40.9 12.2 43.5 12.2C49.1 12.2 53.7 16.4 54.1 21.8C57 22.2 59.2 24 60 26.5H8.2C7.4 25.7 7 24.7 7 23.5Z" fill="url(#cloud-lower-left.svg-cloud)"/>
+    <path d="M11 22.9C12.7 19.8 16 18 19.5 18.5C21 13.4 25.6 10 30.8 10.6C35 11 38.3 13.9 39.4 17.7C43.8 15.5 49 17.3 51.1 21.7C46.2 20.3 41.9 21 37.7 22.1C29.6 24.2 21.5 21.3 11 22.9Z" fill="url(#cloud-lower-left.svg-highlight)"/>
+  </g>
+</g><g transform="translate(112.49506414852428 47.212419108426104) scale(1.875) translate(-32 -16)">
+  <defs>
+    <linearGradient id="cloud-upper-right.svg-cloud" x1="7" y1="10" x2="57" y2="25" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4EA4FF" stop-opacity="0.62"/>
+      <stop offset="0.52" stop-color="#696FEA" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#A85BEA" stop-opacity="0.58"/>
+    </linearGradient>
+    <radialGradient id="cloud-upper-right.svg-highlight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(30 14) rotate(13) scale(27 10)">
+      <stop stop-color="#C8D7FF" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#8C8EF2" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="cloud-upper-right.svg-soft" x="-8" y="-8" width="80" height="48" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="2.5"/>
+    </filter>
+  </defs>
+
+  <g transform="translate(64 0) scale(-1 1)">
+    <path d="M7 23.5C7 18.9 10.8 15.2 15.5 15.2C16.9 10.7 21.1 7.5 26.1 7.5C31 7.5 35.2 10.5 36.7 14.8C38.5 13.2 40.9 12.2 43.5 12.2C49.1 12.2 53.7 16.4 54.1 21.8C57 22.2 59.2 24 60 26.5H8.2C7.4 25.7 7 24.7 7 23.5Z" fill="url(#cloud-upper-right.svg-cloud)"/>
+    <path d="M11 22.9C12.7 19.8 16 18 19.5 18.5C21 13.4 25.6 10 30.8 10.6C35 11 38.3 13.9 39.4 17.7C43.8 15.5 49 17.3 51.1 21.7C46.2 20.3 41.9 21 37.7 22.1C29.6 24.2 21.5 21.3 11 22.9Z" fill="url(#cloud-upper-right.svg-highlight)"/>
+  </g>
+</g></g><path d="M39.4509 93.96 Q32.7309 93.96 26.5709 92.16 Q20.4109 90.36 16.6509 87.48 L21.0509 77.72 Q24.5709 80.28 29.5309 81.92 Q34.4909 83.56 39.5309 83.56 Q45.2909 83.56 47.8109 81.88 Q50.3309 80.2 50.3309 77.56 Q50.3309 75.32 48.5709 74 Q46.8109 72.68 43.8909 71.84 Q40.9709 71 37.5309 70.24 Q34.0909 69.48 30.6109 68.4 Q27.1309 67.32 24.2109 65.52 Q21.2909 63.72 19.5309 60.8 Q17.7709 57.88 17.7709 53.48 C17.7709 42.5 25.2509 37 38.1009 37 H63.2109 V47.4 H40.9009 C34.0009 47.4 30.6509 49 30.6509 52.84 Q30.6509 55 32.4109 56.32 Q34.1709 57.64 37.0509 58.48 Q39.9309 59.32 43.4109 60.04 Q46.8909 60.76 50.3709 61.84 Q53.8509 62.92 56.7709 64.68 Q59.6909 66.44 61.4509 69.32 Q63.2109 72.2 63.2109 76.6 Q63.2109 81.32 60.6109 85.24 Q58.0109 89.16 52.7309 91.56 Q47.4509 93.96 39.4509 93.96 Z M86.7253 93.96C82.832 93.96 78.9653 93.4533 75.1253 92.44C71.2853 91.3733 68.032 89.88 65.3653 87.96L70.4053 78.04C72.5386 79.5867 75.0186 80.8133 77.8453 81.72C80.672 82.6267 83.5253 83.08 86.4053 83.08C89.6586 83.08 92.2186 82.44 94.0853 81.16C95.952 79.88 96.8853 78.12 96.8853 75.88C96.8853 73.7467 96.0586 72.0667 94.4053 70.84C92.752 69.6133 90.0853 69 86.4053 69H80.4853V60.44L96.0853 42.76L97.5253 47.4H68.1653V37H107.365V45.4L91.8453 63.08L85.2853 59.32H89.0453C95.9253 59.32 101.125 60.8667 104.645 63.96C108.165 67.0533 109.925 71.0267 109.925 75.88C109.925 79.0267 109.099 81.9867 107.445 84.76C105.792 87.48 103.259 89.6933 99.8453 91.4C96.432 93.1067 92.0586 93.96 86.7253 93.96Z" fill="white"/></svg>

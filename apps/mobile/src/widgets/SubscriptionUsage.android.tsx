@@ -41,8 +41,14 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
     : getMaterialColors({ scheme: appearance });
   const muted = colors.onSurfaceVariant;
   const providers = props.providers ?? [
-    { name: "Codex", detail: "Open T3 to connect", windows: [], expiresAt: 0, totalWindows: 0 },
-    { name: "Claude", detail: "Open T3 to connect", windows: [], expiresAt: 0, totalWindows: 0 },
+    { name: "Codex", detail: "Open s3code to connect", windows: [], expiresAt: 0, totalWindows: 0 },
+    {
+      name: "Claude",
+      detail: "Open s3code to connect",
+      windows: [],
+      expiresAt: 0,
+      totalWindows: 0,
+    },
   ];
   return (
     // Android lacks widgetURL; one card Button routes taps to the app listener opening props.url.
@@ -71,7 +77,7 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
               </Text>
               {shown.length === 0 ? (
                 <Text color={muted} maxLines={1} style={{ fontSize: 11 }}>
-                  {stale ? "Open T3 to refresh" : provider.detail}
+                  {stale ? "Open s3code to refresh" : provider.detail}
                 </Text>
               ) : null}
               {shown.map((window) => {

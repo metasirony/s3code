@@ -2,19 +2,33 @@
 
 ## s3code Windows and web
 
-The approved S3 artwork is preserved in `s3code/s3-logo-blue.svg` and
-`s3code/s3-logo-black.svg`. The first Windows build uses the blue version for
-all channels. Run `vp run icons:export:s3` to rasterize that SVG with `sharp`
-and the shared PNG/ICO encoder, or `vp run icons:check:s3` to verify the outputs.
-This updates Windows EXE/installer icons, web icons and their public copies,
-the root favicon, and universal PNGs without changing the SVG geometry.
-Existing asset filenames are retained for the build consumers.
+The approved artwork is preserved in `s3code/s3-logo-blue.svg` and
+`s3code/s3-logo-black.svg`. `packages/shared/src/brand.ts` holds the same path
+for transparent web/mobile monograms; the exporter checks it against the approved
+blue SVG before writing. Do not approximate the mark with a font or a favicon tile.
 
-The Icon Composer pipeline below remains for upstream Apple artwork. It can
-overwrite these Windows/web outputs; rerun the S3 export afterwards. Apple and
-native mobile artwork are outside this first Windows export.
+Run `vp run icons:export:s3`, then `vp run icons:export:android`. Verify with
+`vp run icons:check:s3` and `vp run icons:export:android --check`.
+The sharp/ICO pipeline retains existing consumer filenames, exporting blue development,
+black production and sky/cloud Nightly icons, web/public copies, universal PNGs,
+marketing icon thumbnails, and Icon Composer/widget vector marks. The root favicon
+remains the approved blue version. Native Android status-bar, themed, adaptive and
+splash assets keep their transparent/safe-area roles.
 
-## Upstream Icon Composer projects
+The six `*-ios-1024.png` and `*-macos-1024.png` files are still native upstream
+exports and must be regenerated on macOS after changing the Composer projects.
+The mobile UI and flat splash fallbacks use the updated universal PNGs instead.
+Run the native pipeline below on macOS, export the three pre-Tahoe PNGs manually,
+then rerun the S3/Android exports to keep their deterministic flat renditions.
+Do not ship a new Apple package before those native exports are refreshed.
+
+The marketing shell identifies this fork; its body, historical screenshots,
+software-box artwork, social card, testimonials, legal text and official download
+links explicitly describe upstream T3 Code. These are not s3code release assets.
+The official T3 Code for GitHub app has its own preserved icon in
+`apps/web/src/assets/t3-github-app.png`, independent of our application icons.
+
+## Apple Icon Composer projects
 
 The three Icon Composer projects are the source of truth for full application icons:
 
@@ -22,7 +36,7 @@ The three Icon Composer projects are the source of truth for full application ic
 - `nightly/app-icon.icon`
 - `prod/app-icon.icon`
 
-Each project uses `text.svg` for the T3 mark and `background.svg` when the background is a vector layer. Additional layers use semantic names that describe their role and placement.
+Each project uses `text.svg` for the S3 mark and `background.svg` when the background is a vector layer. Additional layers use semantic names that describe their role and placement.
 
 Run `vp run icons:export` from the repository root to regenerate the tracked iOS, Linux, Windows, and web assets. The development web exports are also copied to `apps/web/public` for the browser favicon, web app manifest icons, and splash screen. Run `vp run icons:check` to verify that the generated assets and public copies match their sources without changing files.
 

@@ -9,13 +9,14 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import { Command, Flag } from "effect/cli";
 import sharp from "sharp";
 
 type IconVariant = "dev" | "nightly" | "prod";
 
 const ADAPTIVE_CANVAS = 432;
 const SPLASH_CANVAS = 1152;
-const TEXT = { x: 15.53, y: 37, width: 94.5, height: 57 };
+const TEXT = { x: 16.6509, y: 37, width: 93.2741, height: 56.96 };
 const WORDMARK_FRACTION = 0.48;
 const COMPOSER_CANVAS_PT = 1024;
 const SVG_DENSITY = 300;
@@ -27,8 +28,13 @@ export class AndroidIconRenderError extends Schema.TaggedError<AndroidIconRender
   { layer: Schema.String, cause: Schema.Defect() },
 ) {}
 
-const wordmarkTransform = (size: number) => {
-  const scale = (size * WORDMARK_FRACTION) / TEXT.width;
+class AndroidIconStaleError extends Schema.TaggedError<AndroidIconStaleError>()(
+  "AndroidIconStaleError",
+  { path: Schema.String },
+) {}
+
+const wordmarkTransform = (size: number, fraction = WORDMARK_FRACTION) => {
+  const scale = (size * fraction) / TEXT.width;
   const tx = (size - TEXT.width * scale) / 2 - TEXT.x * scale;
   const ty = (size - TEXT.height * scale) / 2 - TEXT.y * scale;
   return `translate(${tx.toFixed(3)} ${ty.toFixed(3)}) scale(${scale.toFixed(4)})`;
@@ -86,12 +92,13 @@ const readLayerSource = Effect.fn("androidIcons.readLayerSource")(function* (
 const renderForeground = Effect.fn("androidIcons.renderForeground")(function* (
   repositoryRoot: string,
   size: number,
+  fraction = WORDMARK_FRACTION,
 ) {
   const text = yield* readLayerSource(repositoryRoot, "prod", "text.svg");
   const paths = text.match(/<path[^>]*\/>/g) ?? [];
   return yield* rasterize(
     "foreground",
-    canvasSvg(size, `<g transform="${wordmarkTransform(size)}">${paths.join("")}</g>`),
+    canvasSvg(size, `<g transform="${wordmarkTransform(size, fraction)}">${paths.join("")}</g>`),
     size,
   );
 });
@@ -183,12 +190,14 @@ const renderSplashIcon = Effect.fn("androidIcons.renderSplashIcon")(function* (
   return yield* composite(`${variant}-splash`, background, [{ input: foreground }]);
 });
 
-const exportAndroidIcons = Effect.gen(function* () {
+const exportAndroidIcons = Effect.fn("androidIcons.export")(function* (check: boolean) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const repositoryRoot = path.resolve(import.meta.dirname, "..");
   const outputs = [
     ["android-icon-foreground.png", yield* renderForeground(repositoryRoot, ADAPTIVE_CANVAS)],
+    ["android-icon-mark.png", yield* renderForeground(repositoryRoot, ADAPTIVE_CANVAS, 0.64)],
+    ["android-notification-icon.png", yield* renderForeground(repositoryRoot, 96, 2 / 3)],
     [
       "android-icon-background-dev.png",
       yield* renderDevelopmentBackground(repositoryRoot, ADAPTIVE_CANVAS),
@@ -202,11 +211,26 @@ const exportAndroidIcons = Effect.gen(function* () {
     ["android-splash-icon-prod.png", yield* renderSplashIcon(repositoryRoot, "prod")],
   ] as const;
   for (const [name, contents] of outputs) {
-    yield* fs.writeFile(path.join(repositoryRoot, OUTPUT_DIRECTORY, name), contents);
-    yield* Console.log(`wrote ${OUTPUT_DIRECTORY}/${name}`);
+    const target = path.join(repositoryRoot, OUTPUT_DIRECTORY, name);
+    if (check) {
+      const actual = yield* fs.readFile(target);
+      if (!Buffer.from(actual).equals(contents)) {
+        return yield* new AndroidIconStaleError({ path: target });
+      }
+    } else {
+      yield* fs.writeFile(target, contents);
+    }
+    yield* Console.log(`${check ? "verified" : "wrote"} ${OUTPUT_DIRECTORY}/${name}`);
   }
 });
 
 if (import.meta.main) {
-  exportAndroidIcons.pipe(Effect.provide(NodeServices.layer), NodeRuntime.runMain);
+  Command.run(
+    Command.make(
+      "export-android-icons",
+      { check: Flag.Boolean("check").pipe(Flag.withDefault(false)) },
+      ({ check }) => exportAndroidIcons(check),
+    ),
+    { version: "0.0.0" },
+  ).pipe(Effect.provide(NodeServices.layer), NodeRuntime.runMain);
 }

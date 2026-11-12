@@ -24,7 +24,7 @@ export function MobileAppSettingsRow() {
   return (
     <SettingsRow
       {...searchableSetting("mobile-app")}
-      description="Connect to your server from your phone or tablet."
+      description="Connect from your phone or tablet using the official T3 Code mobile app."
       control={
         <div className="flex items-center gap-2">
           {stores.map(({ label, store, url, Icon }) => (
