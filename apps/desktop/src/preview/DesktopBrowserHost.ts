@@ -42,6 +42,7 @@ export interface DesktopBrowserTabDebugger {
   readonly debugger: Electron.Debugger;
   /** Runs after the server clears the tab's cookies, so state kept beside them goes too. */
   readonly cookiesCleared?: () => Promise<void>;
+  readonly setFrameCaptureActive?: (active: boolean) => Promise<void>;
 }
 
 const keyOf = ({ threadId, tabId }: DesktopBrowserTabKey) => `${threadId}\u0000${tabId}`;
@@ -69,6 +70,7 @@ interface AttachedTab {
   readonly capturing: Set<object>;
   /** Whether the client keeps the guest painting, as published on `painting`. */
   painting: boolean;
+  paintingChange: Promise<void> | null;
   /**
    * Driven by the agent since its thread's last turn ended or the guest last throttled. A
    * turn's start can reach us after its first command, so this holds focus once it does.
@@ -238,12 +240,24 @@ export const make = Effect.gen(function* () {
   const syncPainting = (tab: AttachedTab) => {
     const active =
       tabs.get(keyOf(tab.key)) === tab &&
-      (tab.screencasts.size > 0 ||
+      (tab.screenshotTurn !== null ||
+        tab.screencasts.size > 0 ||
         tab.capturing.size > 0 ||
         tab.waitingScreenshots.some((waiting) => waiting.live()));
     if (tab.painting === active) return;
     tab.painting = active;
-    runFork(PubSub.publish(painting, { key: tab.key, active }));
+    if (tab.debuggee.setFrameCaptureActive === undefined) {
+      runFork(PubSub.publish(painting, { key: tab.key, active }));
+      return;
+    }
+    const change = (tab.paintingChange ?? Promise.resolve())
+      .catch(() => {})
+      .then(() => tab.debuggee.setFrameCaptureActive?.(active))
+      .then(() => {
+        runFork(PubSub.publish(painting, { key: tab.key, active }));
+      });
+    tab.paintingChange = change;
+    void change.catch(() => {});
   };
 
   /** A command may wait on the page's next frame, so the guest stays focused until it settles. */
@@ -265,7 +279,8 @@ export const make = Effect.gen(function* () {
     const sent = {};
     tab.capturing.add(sent);
     syncPainting(tab);
-    return send().finally(() => {
+    const capture = tab.paintingChange === null ? send() : tab.paintingChange.then(send);
+    return capture.finally(() => {
       tab.capturing.delete(sent);
       syncPainting(tab);
     });
@@ -354,7 +369,12 @@ export const make = Effect.gen(function* () {
                 : current === undefined
                   ? send(method, params, sessionId)
                   : paintUntilAnswered(tab, () => send(method, params, sessionId));
-            return change === null ? run() : change.then(run);
+            const ready = tab.paintingChange;
+            return ready === null
+              ? change === null
+                ? run()
+                : change.then(run)
+              : Promise.all([change, ready]).then(run);
           };
           return method === "Page.captureScreenshot"
             ? takeScreenshot(
@@ -461,6 +481,7 @@ export const make = Effect.gen(function* () {
       focusPending: new Map(),
       capturing: new Set(),
       painting: false,
+      paintingChange: null,
       agentUsed: false,
       focusReleasing: false,
       screencasts: new Set(),

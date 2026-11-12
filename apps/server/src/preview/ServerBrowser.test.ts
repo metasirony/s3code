@@ -1062,6 +1062,44 @@ it.live("streams to a read-only viewer without allowing takeover, input, or view
   ).pipe(Effect.provide(layer)),
 );
 
+it.effect.each(["Page.captureScreenshot", "Page.startScreencast", "Page.stopScreencast"])(
+  "bounds a viewer stalled in %s, detaches its session and allows reconnect",
+  (blocked) =>
+    Effect.gen(function* () {
+      const { browser, tabId } = yield* ready;
+      const context = contexts[0]!;
+      const createSession = context.newCDPSession.bind(context);
+      const copying = Promise.withResolvers<void>();
+      const pending = Promise.withResolvers<Record<string, unknown>>();
+      const detached = Promise.withResolvers<void>();
+      using _session = vi.spyOn(context, "newCDPSession").mockImplementationOnce(async (target) => {
+        const session = await createSession(target);
+        const send = session.send.getMockImplementation()!;
+        session.send.mockImplementation((method, params) => {
+          if (method !== blocked) return send(method, params);
+          copying.resolve();
+          return pending.promise;
+        });
+        session.detach.mockImplementation(async () => {
+          pending.reject(new Error("Session detached"));
+          detached.resolve();
+        });
+        return session;
+      });
+      const attaching = yield* browser
+        .attachViewer(viewerInput(tabId, false))
+        .pipe(Effect.forkChild);
+      yield* Effect.promise(() => copying.promise);
+      yield* TestClock.adjust("8 seconds");
+      expect(attaching.pollUnsafe()).toMatchObject({ _tag: "Failure" });
+      yield* Effect.promise(() => detached.promise);
+      const viewer = yield* browser.attachViewer(viewerInput(tabId, false));
+      expect(yield* Queue.takeAll(viewer.output)).toContainEqual(
+        expect.objectContaining({ _tag: "frame", data: Buffer.from("frame") }),
+      );
+    }).pipe(Effect.provide(layer), Effect.scoped),
+);
+
 it.live(
   "takeover waits for the running agent and revokes snapshot refs before returning control",
   () =>

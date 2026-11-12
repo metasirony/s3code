@@ -2065,22 +2065,29 @@ describe("PreviewManager", () => {
       Effect.gen(function* () {
         const host = yield* DesktopBrowserHost.DesktopBrowserHost;
         const serverTab = { threadId: "thread-1", tabId: "server-tab-1" };
+        const screenshot = Promise.withResolvers<{
+          isEmpty: () => boolean;
+          toPNG: () => Buffer;
+          toJPEG: () => Buffer;
+          getSize: () => { width: number; height: number };
+        }>();
         const contents = Object.assign(
-          makeTestPreviewWebContents(async () => {
-            throw new Error("unused");
-          }, 42),
+          makeTestPreviewWebContents(() => screenshot.promise, 42),
           {
             isDevToolsOpened: () => false,
             getUserAgent: () => "Electron",
             loadURL: vi.fn(async () => undefined),
           },
         );
-        const screenshot = Promise.withResolvers<unknown>();
-        contents.debugger.sendCommand = vi.fn((method: string) =>
-          method === "Page.captureScreenshot" ? screenshot.promise : Promise.resolve(undefined),
-        ) as unknown as typeof contents.debugger.sendCommand;
         fromId.mockReturnValue(contents);
         const manager = yield* PreviewManager.PreviewManager;
+        const setBackgroundThrottling = vi.fn();
+        const mainContents = Object.assign(contents.hostWebContents!, { setBackgroundThrottling });
+        yield* manager.setMainWindow({
+          isDestroyed: () => false,
+          once: vi.fn(),
+          webContents: mainContents,
+        } as never);
         const capturing = yield* Queue.unbounded<boolean>();
         yield* manager.subscribeStateChanges((_tabId, state) =>
           Queue.offer(capturing, state.capturing).pipe(Effect.asVoid),
@@ -2113,8 +2120,52 @@ describe("PreviewManager", () => {
           }),
         );
         expect(yield* Queue.take(capturing)).toBe(true);
-        screenshot.resolve({ data: "" });
+        expect(contents.setBackgroundThrottling.mock.calls).toEqual([[false]]);
+        expect(setBackgroundThrottling.mock.calls).toEqual([[false]]);
+        screenshot.resolve({
+          isEmpty: () => false,
+          toPNG: () => Buffer.from("png"),
+          toJPEG: () => Buffer.from("jpeg"),
+          getSize: () => ({ width: 100, height: 80 }),
+        });
         expect(yield* Queue.take(capturing)).toBe(false);
+        expect(contents.setBackgroundThrottling.mock.calls).toEqual([[false], [true]]);
+        expect(setBackgroundThrottling.mock.calls).toEqual([[false], [true]]);
+
+        yield* host.handleCommandLine(
+          JSON.stringify({
+            type: "cdp",
+            ...serverTab,
+            message: JSON.stringify({
+              id: 2,
+              method: "Page.startScreencast",
+              sessionId: "t3-preview-page",
+            }),
+          }),
+        );
+        expect(yield* Queue.take(capturing)).toBe(true);
+        yield* manager.startRecording("tab_1");
+        yield* host.handleCommandLine(
+          JSON.stringify({
+            type: "cdp",
+            ...serverTab,
+            message: JSON.stringify({
+              id: 3,
+              method: "Page.stopScreencast",
+              sessionId: "t3-preview-page",
+            }),
+          }),
+        );
+        expect(yield* Queue.take(capturing)).toBe(false);
+        expect(contents.setBackgroundThrottling.mock.calls).toEqual([[false], [true], [false]]);
+        yield* manager.stopRecording("tab_1");
+        expect(contents.setBackgroundThrottling.mock.calls).toEqual([
+          [false],
+          [true],
+          [false],
+          [true],
+        ]);
+        expect(setBackgroundThrottling.mock.calls).toEqual([[false], [true], [false], [true]]);
       }).pipe(Effect.provide(managerLayer()), Effect.scoped),
   );
 

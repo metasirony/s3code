@@ -2673,10 +2673,11 @@ const make = Effect.gen(function* () {
     }
   };
 
-  const attachViewer: ServerBrowser["Service"]["attachViewer"] = Effect.fn(
-    "ServerBrowser.attachViewer",
-  )(function* (input) {
+  const prepareViewer = Effect.fn("ServerBrowser.prepareViewer")(function* (
+    input: Parameters<ServerBrowser["Service"]["attachViewer"]>[0],
+  ) {
     const tab = yield* findTab(input.threadId, input.tabId);
+    let closed = false;
     const output = yield* Queue.make<ServerBrowserViewerOutput>({
       capacity: VIEWER_OUTPUT_LIMIT,
       strategy: "dropping",
@@ -2687,13 +2688,12 @@ const make = Effect.gen(function* () {
         catch: (cause) => new ServerBrowserLaunchError({ cause }),
       }),
       (session) =>
-        Effect.promise(() =>
-          session
-            .send("Page.stopScreencast")
-            .catch(constVoid)
-            .then(() => session.detach())
-            .catch(constVoid),
-        ),
+        Effect.promise(async () => {
+          closed = true;
+          // Detach must not wait on a renderer that has stopped answering commands.
+          void session.send("Page.stopScreencast").catch(constVoid);
+          await session.detach().catch(constVoid);
+        }),
     );
     const quality = Math.min(100, Math.max(1, Math.round(input.quality)));
     // Chromium may drop the final frame during a burst; send a still when it settles.
@@ -2706,8 +2706,9 @@ const make = Effect.gen(function* () {
     const startScreencast = (scale: number) => {
       screencastScale = scale;
       screencastParams = screencastParams.then(async () => {
-        if (tab.capturing > 0) return;
+        if (closed || tab.capturing > 0) return;
         await session.send("Page.stopScreencast").catch(constVoid);
+        if (closed) return;
         await session
           .send("Page.startScreencast", {
             format: "jpeg",
@@ -2781,7 +2782,9 @@ const make = Effect.gen(function* () {
       const data = await withCaptureLock(tab, () =>
         ServerBrowserPage.captureViewport(session, { format: "jpeg", quality }),
       ).catch(() => null);
-      if (data) viewer.push({ _tag: "frame", data: Buffer.from(data, "base64"), ack: Effect.void });
+      if (data && !closed)
+        viewer.push({ _tag: "frame", data: Buffer.from(data, "base64"), ack: Effect.void });
+      return !!data;
     };
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
     yield* Effect.addFinalizer(() =>
@@ -2791,6 +2794,7 @@ const make = Effect.gen(function* () {
     );
     let screencastStarted = false;
     session.on("Page.screencastFrame", (frame) => {
+      if (closed) return;
       screencastStarted = true;
       if (framesInFlight > 0) mayHaveDropped = true;
       framesInFlight += 1;
@@ -2838,7 +2842,11 @@ const make = Effect.gen(function* () {
     yield* Effect.promise(() => startScreencast(1));
     // An idle page does not repaint for a new screencast, so the viewer
     // starts from a still unless a live frame beat it.
-    if (!screencastStarted) yield* Effect.promise(pushStill);
+    if (!screencastStarted && !(yield* Effect.promise(pushStill)) && !screencastStarted) {
+      return yield* new ServerBrowserLaunchError({
+        cause: new Error("The preview supplied no first frame."),
+      });
+    }
     return {
       output,
       input: (raw: unknown) =>
@@ -2910,6 +2918,25 @@ const make = Effect.gen(function* () {
           }
         }),
     } satisfies ServerBrowserViewer;
+  });
+
+  const attachViewer: ServerBrowser["Service"]["attachViewer"] = Effect.fn(
+    "ServerBrowser.attachViewer",
+  )(function* (input) {
+    const viewerScope = yield* Scope.fork(yield* Effect.scope, "sequential");
+    return yield* prepareViewer(input).pipe(
+      Effect.provideService(Scope.Scope, viewerScope),
+      Effect.timeoutOrElse({
+        duration: "8 seconds",
+        orElse: () =>
+          Effect.fail(
+            new ServerBrowserLaunchError({
+              cause: new Error("The preview first frame timed out."),
+            }),
+          ),
+      }),
+      Effect.onError(() => Scope.close(viewerScope, Exit.void)),
+    );
   });
 
   yield* manager.events.pipe(Stream.runForEach(mirrorManagerEvent), Effect.forkScoped);
