@@ -2695,8 +2695,7 @@ export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig"
     updateRepository: Config.String("T3CODE_DESKTOP_UPDATE_REPOSITORY").pipe(Config.option),
   });
   const rawRepo = (
-    Option.getOrUndefined(env.updateRepository)?.trim() ||
-    "metasirony/s3code"
+    Option.getOrUndefined(env.updateRepository)?.trim() || "metasirony/s3code"
   ).trim();
   if (!rawRepo) return undefined;
 

@@ -36,7 +36,7 @@ T3 Code Nightly. Keep each app's data separate; automatic import from T3 is disa
 ## Upstream and license
 
 T3 Code is developed by [T3 Tools and its contributors](https://github.com/pingdotgg/t3code).
-Its [user guides](docs/user/README.md) describe the shared functionality; references
+Its [user guides](docs/user/usage.md) describe the shared functionality; references
 to official downloads and hosted services refer to upstream. Planned integrations
 such as Skill Switch and Excalidraw are not shipped features of this fork.
 

@@ -28,6 +28,7 @@ import {
   type BackupSpaceProbe,
   readServiceState,
   registerServiceTask,
+  repointServiceUnit,
   serviceLauncherIsRunning,
   serviceLauncherLockPath,
   writeServiceState,
@@ -61,6 +62,18 @@ const writeSparseFile = (filePath: string, size: number) =>
     yield* fileSystem.writeFileString(filePath, "");
     yield* fileSystem.truncate(filePath, size);
   });
+
+it.each([
+  "ExecStart=/home/user/.s3code/runtime/versions/1.0.0/s3code __service-launcher",
+  "<string>/home/user/.s3code/runtime/versions/1.0.0/s3code</string><string>__service-launcher</string>",
+  '<Arguments>--headless "C:\\Users\\user\\.s3code\\runtime\\versions\\1.0.0\\s3code.exe" "__service-launcher"</Arguments>',
+])("repoints a fork service program without taking over an official one: %s", (unit) => {
+  const updated = unit.replace("1.0.0", "1.1.0");
+  assert.equal(repointServiceUnit(unit, "1.1.0"), updated);
+  assert.equal(repointServiceUnit(updated, "1.0.0"), updated);
+  const official = unit.replaceAll("s3code", "t3");
+  assert.equal(repointServiceUnit(official, "1.1.0"), official);
+});
 
 it("accepts only exact semantic versions", () => {
   for (const version of ["0.0.0", "1.2.3", "1.2.3-alpha.1", "1.2.3-0", "1.2.3+001"]) {
@@ -125,7 +138,7 @@ it("rejects contradictory service state", () => {
 });
 
 const unitPlan = (root: string, version: string) => ({
-  program: [`${root}/runtime/versions/${version}/t3`, "__service-launcher"],
+  program: [`${root}/runtime/versions/${version}/s3code`, "__service-launcher"],
   baseDir: root,
   logPath: `${root}/logs/boot-service.log`,
   unitPath: `${root}/unit/t3code.service`,
@@ -138,7 +151,7 @@ const writeFakeRuntime = (
   childSource: string,
 ) =>
   Effect.gen(function* () {
-    const entryPath = path.join(versionDir, "t3");
+    const entryPath = path.join(versionDir, "s3code");
     yield* fs.makeDirectory(versionDir, { recursive: true });
     yield* fs.writeFileString(entryPath, `#!${process.execPath}\n${childSource}`);
     yield* fs.chmod(entryPath, 0o755);

@@ -58,7 +58,7 @@ const windowsTaskOptions = {
 
 it("reads the served T3 home and log back out of a rendered unit, plist, or task", () => {
   const plan = (baseDir: string) => ({
-    program: [`${baseDir}/runtime/versions/1.2.3/t3`, "__service-launcher"],
+    program: [`${baseDir}/runtime/versions/1.2.3/s3code`, "__service-launcher"],
     baseDir,
     logPath: `${baseDir}/userdata/logs/boot-service.log`,
     unitPath: "/home/theo/.config/systemd/user/s3code.service",
@@ -101,7 +101,7 @@ it("reads the served T3 home and log back out of a rendered unit, plist, or task
 
 it("protects the server unit from agents under CPU and memory pressure", () => {
   const unit = BootService.renderBootServiceUnit({
-    program: ["/home/theo/.t3/runtime/versions/1.2.3/t3", "__service-launcher"],
+    program: ["/home/theo/.t3/runtime/versions/1.2.3/s3code", "__service-launcher"],
     baseDir: "/home/theo/.t3",
     logPath: "/home/theo/.t3/userdata/logs/boot-service.log",
     unitPath: "/home/theo/.config/systemd/user/s3code.service",
@@ -133,7 +133,7 @@ it.each([
       BootService.renderBootServiceTask(plan, windowsTaskOptions),
   ],
 ] as const)("reads the launcher back out of %s", (_, baseDir, render) => {
-  const program = `${baseDir}/runtime/versions/1.2.3/t3`;
+  const program = `${baseDir}/runtime/versions/1.2.3/s3code`;
   expect(
     BootService.bootServiceProgramOf(
       render({ program: [program, "__service-launcher"], baseDir, logPath: "/log", unitPath: "" }),
@@ -880,7 +880,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
           protocol: SERVICE_LAUNCHER_PROTOCOL,
           activeVersion: "1.2.4",
         });
-        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.4/t3");
+        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.4/s3code");
         expect(
           commands.filter(
             (command) =>
@@ -902,7 +902,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
           protocol: SERVICE_LAUNCHER_PROTOCOL,
           activeVersion: "1.2.5",
         });
-        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.5/t3");
+        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.5/s3code");
         expect((yield* latest.status).current).toBe(true);
         expect(
           yield* fs.exists(path.join(path.dirname(statePath), SERVICE_RESTART_PENDING_FILE)),
@@ -920,7 +920,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
         const unit = yield* fs.readFileString(plan.unitPath);
         yield* fs.writeFileString(
           plan.unitPath,
-          unit.replace("versions/1.2.3/t3", "versions/1.2.2/t3"),
+          unit.replace("versions/1.2.3/s3code", "versions/1.2.2/s3code"),
         );
         yield* fs.writeFileString(
           statePath,
@@ -1048,7 +1048,7 @@ process.disconnect();
           protocol: SERVICE_LAUNCHER_PROTOCOL,
           activeVersion: "1.2.4",
         });
-        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.4/t3");
+        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.4/s3code");
         expect(
           yield* fs.readFileString(
             path.join(path.dirname(statePath), SERVICE_RESTART_PENDING_FILE),
@@ -1353,9 +1353,9 @@ process.disconnect();
       expect((yield* service.status).installed).toBe(false);
       expect(commands.some((command) => command.startsWith("systemctl "))).toBe(false);
       // launchd can take 90s to bootout; the runner's 60s default could let bootstrap race it.
-      expect(timeouts.get("launchctl bootout --wait gui/501/io.github.metasirony.s3code.service")).toEqual(
-        Duration.seconds(120),
-      );
+      expect(
+        timeouts.get("launchctl bootout --wait gui/501/io.github.metasirony.s3code.service"),
+      ).toEqual(Duration.seconds(120));
     }),
   );
 
@@ -1367,7 +1367,7 @@ process.disconnect();
       const task = yield* fs.readFileString(plan.unitPath);
 
       expect(plan.unitPath).toBe(
-        path.join(path.dirname(plan.baseDir), "AppData", "Local", "t3code", "s3code-task.xml"),
+        path.join(path.dirname(plan.baseDir), "AppData", "Local", "s3code", "s3code-task.xml"),
       );
       expect(BootService.bootServiceProgramOf(task)).toBe(runtime.entryPath);
       expect(BootService.bootServiceBaseDirOf(task)).toBe(plan.baseDir);
@@ -1378,8 +1378,8 @@ process.disconnect();
         activeVersion: "1.2.3",
       });
       expect(commands.filter((command) => command.startsWith("schtasks "))).toEqual([
-        `schtasks /Create /XML ${plan.unitPath} /TN t3code-PC-theo /F`,
-        "schtasks /Run /TN t3code-PC-theo",
+        `schtasks /Create /XML ${plan.unitPath} /TN s3code-PC-theo /F`,
+        "schtasks /Run /TN s3code-PC-theo",
       ]);
       // No launcher holds the lock here.
       expect(yield* service.status).toMatchObject({
@@ -1389,7 +1389,7 @@ process.disconnect();
       });
 
       // A task that Task Scheduler refuses to delete stays installed, so a retry finds it.
-      control.failCommand = "schtasks /Delete /TN t3code-PC-theo /F";
+      control.failCommand = "schtasks /Delete /TN s3code-PC-theo /F";
       expect((yield* service.uninstall.pipe(Effect.flip))._tag).toBe("BootServiceCommandError");
       expect((yield* service.status).installed).toBe(true);
       control.failCommand = undefined;
@@ -1397,9 +1397,9 @@ process.disconnect();
       commands.length = 0;
       expect(yield* service.uninstall).toBe(true);
       expect(commands).toEqual([
-        "schtasks /Change /TN t3code-PC-theo /DISABLE",
-        "schtasks /End /TN t3code-PC-theo",
-        "schtasks /Delete /TN t3code-PC-theo /F",
+        "schtasks /Change /TN s3code-PC-theo /DISABLE",
+        "schtasks /End /TN s3code-PC-theo",
+        "schtasks /Delete /TN s3code-PC-theo /F",
       ]);
       expect(control.task).toBeUndefined();
       expect((yield* service.status).installed).toBe(false);
@@ -1439,11 +1439,11 @@ process.disconnect();
       commands.length = 0;
       yield* service.withStopped(Effect.sync(() => commands.push("repair")));
       expect(commands.filter((command) => !command.includes("/Query"))).toEqual([
-        "schtasks /Change /TN t3code-PC-theo /DISABLE",
-        "schtasks /End /TN t3code-PC-theo",
+        "schtasks /Change /TN s3code-PC-theo /DISABLE",
+        "schtasks /End /TN s3code-PC-theo",
         "repair",
-        "schtasks /Change /TN t3code-PC-theo /ENABLE",
-        "schtasks /Run /TN t3code-PC-theo",
+        "schtasks /Change /TN s3code-PC-theo /ENABLE",
+        "schtasks /Run /TN s3code-PC-theo",
       ]);
     }),
   );
@@ -1454,9 +1454,9 @@ process.disconnect();
       const plan = yield* service.install();
       const inside = yield* makeService(undefined, "1.2.4", undefined, true);
       const handoff = [
-        `schtasks /Create /XML ${plan.unitPath} /TN t3code-PC-theo /F`,
-        "schtasks /End /TN t3code-PC-theo",
-        "schtasks /Run /TN t3code-PC-theo",
+        `schtasks /Create /XML ${plan.unitPath} /TN s3code-PC-theo /F`,
+        "schtasks /End /TN s3code-PC-theo",
+        "schtasks /Run /TN s3code-PC-theo",
       ];
       commands.length = 0;
 

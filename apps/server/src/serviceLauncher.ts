@@ -62,7 +62,7 @@ interface ManagedChild {
 const runtimePaths = (baseDir: string, version: string) => {
   const versionDir = NodePath.join(baseDir, "runtime", "versions", version);
   // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
-  const executableName = process.platform === "win32" ? "t3.exe" : "t3";
+  const executableName = process.platform === "win32" ? "s3code.exe" : "s3code";
   return {
     versionDir,
     entryPath: NodePath.join(versionDir, executableName),
@@ -164,9 +164,9 @@ function serviceUnitFromEnvironment(env: NodeJS.ProcessEnv = process.env): Servi
 // Only the version segment changes, so quoted or escaped paths stay as rendered.
 // The launch agent's PATH names a versions directory without the executable; leave it.
 const SERVICE_UNIT_PROGRAMS = [
-  /^(ExecStart=.*?[\\/]runtime[\\/]versions[\\/])([^\\/\s"]+)([\\/]t3)(?=["\s])/m,
-  /(<string>[^<]*?[\\/]runtime[\\/]versions[\\/])([^\\/<]+)([\\/]t3<\/string>\s*<string>__service-launcher<\/string>)/,
-  /(<Arguments>--headless "[^"<]*?[\\/]runtime[\\/]versions[\\/])([^\\/"<]+)([\\/]t3\.exe" "__service-launcher")/,
+  /^(ExecStart=.*?[\\/]runtime[\\/]versions[\\/])([^\\/\s"]+)([\\/]s3code)(?=["\s])/m,
+  /(<string>[^<]*?[\\/]runtime[\\/]versions[\\/])([^\\/<]+)([\\/]s3code<\/string>\s*<string>__service-launcher<\/string>)/,
+  /(<Arguments>--headless "[^"<]*?[\\/]runtime[\\/]versions[\\/])([^\\/"<]+)([\\/]s3code\.exe" "__service-launcher")/,
 ] as const;
 
 /**
@@ -174,7 +174,7 @@ const SERVICE_UNIT_PROGRAMS = [
  * already at that version or a newer one is returned unchanged: `t3 update`
  * may have repointed it to a later version while this commit was in flight.
  */
-function repointServiceUnit(contents: string, version: string): string {
+export function repointServiceUnit(contents: string, version: string): string {
   for (const program of SERVICE_UNIT_PROGRAMS) {
     const match = program.exec(contents);
     if (match === null) continue;

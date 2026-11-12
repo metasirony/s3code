@@ -896,7 +896,7 @@ it.effect(
           }),
         )).replaceAll(yield* encodeStringJson("/workspace"), yield* encodeStringJson(cwd)),
       );
-      const driver = yield* CodexReplay.makeReplayDriver(transcript);
+      const driver = yield* CodexReplay.makeReplayDriver(withConfigReads(transcript));
       yield* Effect.gen(function* () {
         const orchestrator = yield* Orchestrator.OrchestratorV2;
         const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
@@ -1015,7 +1015,7 @@ it.effect("does not count a delegated prompt as a requested skill", () =>
         }),
       )).replaceAll(yield* encodeStringJson("/workspace"), yield* encodeStringJson(cwd)),
     );
-    const driver = yield* CodexReplay.makeReplayDriver(transcript);
+    const driver = yield* CodexReplay.makeReplayDriver(withConfigReads(transcript));
     yield* Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;
       const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
@@ -1238,7 +1238,7 @@ it.effect("counts native and nested Codex child skill reads on the owning run", 
         }),
       )).replaceAll(yield* encodeStringJson("/workspace"), yield* encodeStringJson(cwd)),
     );
-    const driver = yield* CodexReplay.makeReplayDriver(transcript);
+    const driver = yield* CodexReplay.makeReplayDriver(withConfigReads(transcript));
     yield* Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;
       const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
@@ -9064,6 +9064,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
                 },
               ],
             }),
+            undefined,
             undefined,
             undefined,
             undefined,

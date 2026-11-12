@@ -51,7 +51,7 @@ it.effect("authenticates each release page until the requested channel is found"
     const httpClient = HttpClient.make((request) => {
       const url = new URL(request.url);
       assert.equal(url.origin, "https://api.github.com");
-      assert.equal(url.pathname, "/repos/pingdotgg/t3code/releases");
+      assert.equal(url.pathname, "/repos/metasirony/s3code/releases");
       assert.equal(request.headers.accept, "application/vnd.github+json");
       assert.equal(request.headers.authorization, "Bearer gh-token");
       const page = url.searchParams.get("page") ?? "";
@@ -470,7 +470,7 @@ it.layer(NodeServices.layer)("t3 update with a background service", (it) => {
       yield* fs.writeFileString(runtime.sentinelPath, `${version}\n`);
       const unitPath = path.join(baseDir, "t3code.service");
       const logPath = path.join(baseDir, "boot-service.log");
-      // An earlier `t3 update` pointed the service at this version without restarting it.
+      // An earlier `s3code update` pointed the service at this version without restarting it.
       const service = Layer.mock(BootService.BootService, {
         status: Effect.succeed<BootService.BootServiceStatus>({
           supported: true,
@@ -490,7 +490,7 @@ it.layer(NodeServices.layer)("t3 update with a background service", (it) => {
           input.args?.includes("--version") === true
             ? unrelatedLsof
                 .run(input)
-                .pipe(Effect.map((result) => ({ ...result, stdout: `t3 v${version}\n` })))
+                .pipe(Effect.map((result) => ({ ...result, stdout: `s3code v${version}\n` })))
             : unrelatedLsof.run(input),
       });
 
@@ -521,7 +521,7 @@ it.layer(NodeServices.layer)("t3 update with a background service", (it) => {
 
       assert.include(
         output,
-        `Background service still running the version before ${version}. Run \`t3 service restart\` when you are ready to switch it to ${version}.`,
+        `Background service still running the version before ${version}. Run \`s3code service restart\` when you are ready to switch it to ${version}.`,
       );
     }).pipe(
       Effect.scoped,

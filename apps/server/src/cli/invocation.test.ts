@@ -126,7 +126,7 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
 
       // A global npm launcher runs the downloaded executable; PATH's `t3` is that launcher.
       const prefix = path.join(home, "npm");
-      const npmLauncher = path.join(prefix, "lib/node_modules/t3/bin/t3.mjs");
+      const npmLauncher = path.join(prefix, "lib/node_modules/@metasirony/s3code/bin/s3code.mjs");
       yield* fs.makeDirectory(path.dirname(npmLauncher), { recursive: true });
       yield* fs.makeDirectory(path.join(prefix, "bin"));
       yield* fs.writeFileString(npmLauncher, "", { mode: 0o755 });
@@ -216,7 +216,7 @@ it.layer(NodeServices.layer)("manual server installation ownership", (it) => {
         yield* fs.writeFileString(entry, "");
         yield* fs.writeFileString(
           path.join(path.dirname(entry), "../package.json"),
-          `{"name":"s3code","version":"${packageJson.version}","bin":{"s3code":"./bin/s3code.mjs"}}`,
+          `{"name":"@metasirony/s3code","version":"${packageJson.version}","bin":{"s3code":"./bin/s3code.mjs"}}`,
         );
         const launchedBy = entry.endsWith("s3code.mjs");
         const installation = yield* resolveServerInstallation.pipe(
@@ -247,7 +247,7 @@ it.layer(NodeServices.layer)("manual server installation ownership", (it) => {
       yield* fs.writeFileString(entry, "");
       yield* fs.writeFileString(
         path.join(packageRoot, "package.json"),
-        '{"name":"s3code","version":"0.0.45","bin":{"s3code":"./dist/bin.mjs"}}',
+        '{"name":"@metasirony/s3code","version":"0.0.45","bin":{"s3code":"./dist/bin.mjs"}}',
       );
       const resolve = resolveServerInstallation.pipe(
         Effect.provideService(HostProcess.Arguments, ["node", entry]),
@@ -292,7 +292,7 @@ it.layer(NodeServices.layer)("manual server installation ownership", (it) => {
       ] as const) {
         yield* fs.writeFileString(
           path.join(packageRoot, "package.json"),
-          `{"name":"s3code","version":"${version}","bin":{"s3code":"./bin/s3code.mjs"}}`,
+          `{"name":"@metasirony/s3code","version":"${version}","bin":{"s3code":"./bin/s3code.mjs"}}`,
         );
         expect(yield* resolve).toEqual(expected);
       }
