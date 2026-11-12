@@ -114,7 +114,7 @@ function createWindow(
     resizable: false,
     show: false,
     skipTaskbar: true,
-    title: "s3code Snapshot Animation",
+    title: "S3 Code Snapshot Animation",
     transparent: true,
     webPreferences: {
       backgroundThrottling: false,

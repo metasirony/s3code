@@ -92,7 +92,7 @@ export function AgentActivityWidget(
   const summaryTint = rows[0] ? phaseTint(rows[0].phase) : secondaryForeground;
   const emptyMessage = loaded
     ? (props.subtitle ?? "No active agents")
-    : "Open s3code to load agent activity";
+    : "Open S3 Code to load agent activity";
 
   // Widget taps open the containing app, and every build accepts the prod
   // scheme as a link prefix, so dev and preview builds route this too.
@@ -178,7 +178,7 @@ export function AgentActivityWidget(
             lineLimit(1),
           ]}
         >
-          {summary || (accessory ? "s3code" : "")}
+          {summary || (accessory ? "S3 Code" : "")}
         </Text>
         <Spacer minLength={0} />
       </HStack>

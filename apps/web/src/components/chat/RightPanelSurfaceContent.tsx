@@ -124,7 +124,7 @@ export function RightPanelSurfaceContent(props: {
         return (
           <PullRequestsUnavailableState
             title="Pull requests unavailable"
-            error="Update this environment's s3code server to browse pull requests."
+            error="Update this environment's S3 Code server to browse pull requests."
           />
         );
       }

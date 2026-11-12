@@ -56,8 +56,8 @@ function SubscriptionUsage(
   const primary = palette?.foreground ?? "primary";
   const secondary = palette?.secondary ?? "secondary";
   const providers = props.providers ?? [
-    { name: "Codex", detail: "Open s3code to connect", windows: [], expiresAt: 0 },
-    { name: "Claude", detail: "Open s3code to connect", windows: [], expiresAt: 0 },
+    { name: "Codex", detail: "Open S3 Code to connect", windows: [], expiresAt: 0 },
+    { name: "Claude", detail: "Open S3 Code to connect", windows: [], expiresAt: 0 },
   ];
   const columns = providers.map((provider) => {
     const stale = provider.windows.length > 0 && now >= provider.expiresAt;
@@ -90,7 +90,7 @@ function SubscriptionUsage(
               ].slice(0, limit)
             : windows.slice(0, limit);
     const detail = stale
-      ? "Open s3code to refresh"
+      ? "Open S3 Code to refresh"
       : period !== "auto" && windows.length === 0 && provider.windows.length > 0
         ? `No ${period} limit reported`
         : provider.detail;

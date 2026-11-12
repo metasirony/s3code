@@ -2756,8 +2756,8 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
 
 export function resolveDesktopProductName(version: string): string {
   return resolveDesktopUpdateChannel(version) === "nightly"
-    ? "s3code (Nightly)"
-    : (desktopPackageJson.productName ?? "s3code");
+    ? "S3 Code (Nightly)"
+    : (desktopPackageJson.productName ?? "S3 Code");
 }
 
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -2834,19 +2834,19 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         // macOS 26 offers Messages/Mail codes in every text field unless opted out.
         NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac: true,
         NSLocalNetworkUsageDescription:
-          "s3code connects to devices on your local network for remote environments and commands run by terminals and coding agents.",
+          "S3 Code connects to devices on your local network for remote environments and commands run by terminals and coding agents.",
         NSCalendarsUsageDescription:
-          "Commands you run in s3code may need access to your calendars.",
+          "Commands you run in S3 Code may need access to your calendars.",
         NSCalendarsFullAccessUsageDescription:
-          "Commands you run in s3code may need to read and write your calendar events.",
+          "Commands you run in S3 Code may need to read and write your calendar events.",
         NSCalendarsWriteOnlyAccessUsageDescription:
-          "Commands you run in s3code may need to add events to your calendars.",
+          "Commands you run in S3 Code may need to add events to your calendars.",
         NSScreenCaptureUsageDescription:
-          "s3code captures the active window when you use the window capture shortcut.",
+          "S3 Code captures the active window when you use the window capture shortcut.",
         NSCameraUsageDescription:
-          "s3code lets commands run by terminals and coding agents use the camera.",
+          "S3 Code lets commands run by terminals and coding agents use the camera.",
         NSMicrophoneUsageDescription:
-          "s3code lets commands run by terminals and coding agents use the microphone.",
+          "S3 Code lets commands run by terminals and coding agents use the microphone.",
         // macOS lists an app under Default web browser only when it opens web
         // pages as documents as well as http and https links (see protocols).
         CFBundleDocumentTypes: [
@@ -2860,7 +2860,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       },
       protocols: [
         {
-          name: "s3code",
+          name: "S3 Code",
           schemes: ["s3code", "s3code-dev"],
         },
         {
@@ -2913,7 +2913,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       maintainer: "metasirony",
       protocols: [
         {
-          name: "s3code",
+          name: "S3 Code",
           schemes: ["s3code", "s3code-dev"],
         },
       ],
@@ -3905,7 +3905,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     private: true,
     packageManager: rootPackageJson.packageManager,
     description:
-      "s3code is an open-source desktop app for coding agents. Work with your existing agent subscriptions, review code changes, and run commands in your projects. Connect from desktop, web, or mobile to continue working remotely.",
+      "S3 Code is an open-source desktop app for coding agents. Work with your existing agent subscriptions, review code changes, and run commands in your projects. Connect from desktop, web, or mobile to continue working remotely.",
     license: "MIT",
     homepage: "https://github.com/metasirony/s3code",
     author: "T3 Tools",
@@ -4233,7 +4233,7 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
     Flag.optional,
   ),
 }).pipe(
-  Command.withDescription("Build a desktop artifact for s3code."),
+  Command.withDescription("Build a desktop artifact for S3 Code."),
   Command.withHandler((input) => Effect.flatMap(resolveBuildOptions(input), buildDesktopArtifact)),
 );
 

@@ -92,15 +92,15 @@ export const readLiveHomeOwner = Effect.fn("DesktopHomeOwner.readLiveHomeOwner")
 export const homeOwnedMessage = (owner: Option.Option<HomeOwner>): string =>
   Option.match(owner, {
     onNone: () =>
-      "Another s3code server, such as the background service, is using this data directory, or an older background service is set up for it. Stop that server or try `s3code update`. If the older launcher cannot update, run `s3code service uninstall` and optionally reinstall with `s3code service install` from a current CLI. Use `npx @metasirony/s3code@latest` if `s3code` is missing or outdated, and pass `--base-dir` with the service's T3 home to each command. Then reopen s3code. You can also set a separate T3CODE_HOME and pair with the running server.",
+      "Another S3 Code server, such as the background service, is using this data directory, or an older background service is set up for it. Stop that server or try `s3code update`. If the older launcher cannot update, run `s3code service uninstall` and optionally reinstall with `s3code service install` from a current CLI. Use `npx @metasirony/s3code@latest` if `s3code` is missing or outdated, and pass `--base-dir` with the service's T3 home to each command. Then reopen S3 Code. You can also set a separate T3CODE_HOME and pair with the running server.",
     onSome: (owner) => {
       const kind = owner.serviceManaged
-        ? "The s3code background service"
-        : "Another s3code server (for example `s3code serve`, or one started over SSH)";
+        ? "The S3 Code background service"
+        : "Another S3 Code server (for example `s3code serve`, or one started over SSH)";
       const version = owner.serverVersion ? `, version ${owner.serverVersion}` : "";
       const stop = owner.serviceManaged
         ? "Stop it with `s3code service uninstall`, passing `--base-dir` with this T3 home"
-        : "If a s3code app on another machine started it over SSH, that app restarts it: remove or disconnect that SSH environment there, or quit that app. Then stop the server";
-      return `${kind} is using this T3 home (PID ${owner.pid}, port ${owner.port}${version}). ${stop}, and reopen s3code. You can also set a separate T3CODE_HOME and pair with the running server.`;
+        : "If an S3 Code app on another machine started it over SSH, that app restarts it: remove or disconnect that SSH environment there, or quit that app. Then stop the server";
+      return `${kind} is using this T3 home (PID ${owner.pid}, port ${owner.port}${version}). ${stop}, and reopen S3 Code. You can also set a separate T3CODE_HOME and pair with the running server.`;
     },
   });

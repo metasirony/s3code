@@ -1,7 +1,7 @@
 {
   "uuid": "snap-shot@t3.codes",
-  "name": "s3code SnapShots",
-  "description": "Allows s3code to capture the focused window, identify it for optional accessibility text, and animate it into s3code. Disable this extension to revoke access.",
+  "name": "S3 Code SnapShots",
+  "description": "Allows S3 Code to capture the focused window, identify it for optional accessibility text, and animate it into S3 Code. Disable this extension to revoke access.",
   "shell-version": ["45", "46", "47", "48", "49", "50", "51"],
   "version": 3,
   "url": "https://github.com/pingdotgg/t3code"

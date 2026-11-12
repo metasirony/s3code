@@ -102,7 +102,7 @@ export const buildInitialFxProviderSnapshot = (
       auth: { status: "unknown" },
       message: settings.enabled
         ? "Checking fx CLI availability..."
-        : "fx is disabled in s3code settings.",
+        : "fx is disabled in S3 Code settings.",
     }),
   );
 
@@ -160,7 +160,7 @@ export const checkFxProviderStatus = Effect.fn("checkFxProviderStatus")(function
       version: null,
       status: "warning",
       auth: { status: "unknown" },
-      message: "fx is disabled in s3code settings.",
+      message: "fx is disabled in S3 Code settings.",
     });
   }
 

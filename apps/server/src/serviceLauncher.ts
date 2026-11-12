@@ -818,7 +818,7 @@ export class Launcher {
       const lock = await tryAcquireLauncherLock(lockPath);
       if (lock !== undefined) return lock;
       if (attempt >= LOCK_ATTEMPTS) {
-        throw new Error("Another s3code service launcher still runs for this T3 home.");
+        throw new Error("Another S3 Code service launcher still runs for this T3 home.");
       }
       await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
     }
@@ -1250,7 +1250,7 @@ export class Launcher {
     // Signal listeners alone do not keep Node alive.
     this.#timer = setInterval(() => {}, 2_147_483_647);
     this.#log(
-      "[service-launcher] Another s3code server owns this T3 home. Stop it, then restart this service.\n",
+      "[service-launcher] Another S3 Code server owns this T3 home. Stop it, then restart this service.\n",
     );
   }
 
@@ -1291,7 +1291,7 @@ export interface LauncherOptions {
 export async function main(options: LauncherOptions = {}): Promise<void> {
   const baseDir = (options.baseDir ?? process.env.T3CODE_HOME)?.trim();
   if (baseDir === undefined || baseDir === "") {
-    throw new Error("T3CODE_HOME is required by the s3code service launcher.");
+    throw new Error("T3CODE_HOME is required by the S3 Code service launcher.");
   }
   const output =
     options.logFile === undefined ? undefined : NodeFS.openSync(options.logFile, "a", 0o600);

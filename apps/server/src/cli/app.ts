@@ -60,7 +60,7 @@ export class DesktopAppUnreachableError extends Schema.TaggedError<DesktopAppUnr
   },
 ) {
   override get message(): string {
-    return "Could not reach the s3code desktop app. Start or update the desktop app on this machine, then run `s3code app` again. A running s3code server is not enough.";
+    return "Could not reach the S3 Code desktop app. Start or update the desktop app on this machine, then run `s3code app` again. A running S3 Code server is not enough.";
   }
 }
 
@@ -266,7 +266,7 @@ const runAppCommand = Effect.fn("cli.app")(function* (flags: {
     });
   }
 
-  yield* Console.log(`Opened ${workspaceRoot} in s3code.`);
+  yield* Console.log(`Opened ${workspaceRoot} in S3 Code.`);
 });
 
 export const appCommand = Command.make("app", {
@@ -276,6 +276,6 @@ export const appCommand = Command.make("app", {
     Argument.optional,
   ),
 }).pipe(
-  Command.withDescription("Open a project in the running s3code desktop app."),
+  Command.withDescription("Open a project in the running S3 Code desktop app."),
   Command.withHandler(runAppCommand),
 );

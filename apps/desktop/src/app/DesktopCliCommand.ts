@@ -299,7 +299,7 @@ export const make = Effect.gen(function* () {
       // PATH would split the folder at the `;`, leaving two wrong entries behind.
       if (binDirectory.includes(";")) {
         return yield* fail(
-          `s3code cannot put ${binDirectory} on PATH because it has a ";". Run ${launcher} directly.`,
+          `S3 Code cannot put ${binDirectory} on PATH because it has a ";". Run ${launcher} directly.`,
         );
       }
       const entries = pathEntries(yield* readUserPath, ";");
@@ -398,11 +398,11 @@ export const make = Effect.gen(function* () {
       return yield* fail("Install the s3code command first.");
     }
     const setup = startupLine(installed.value);
-    if (setup === undefined) return yield* fail("s3code cannot add s3code to this shell's PATH.");
+    if (setup === undefined) return yield* fail("S3 Code cannot add s3code to this shell's PATH.");
     const shadowedBy = yield* foreignFirstOnPath;
     if (Option.isSome(shadowedBy)) {
       return yield* fail(
-        `Another s3code at ${shadowedBy.value} runs first; s3code leaves it in place.`,
+        `Another s3code at ${shadowedBy.value} runs first; S3 Code leaves it in place.`,
       );
     }
     if (!(yield* folderOnPath(installed.value)) && !(yield* hasLine(setup))) {
@@ -429,7 +429,7 @@ export const make = Effect.gen(function* () {
       if (existing !== undefined) {
         const target = yield* fs.readLink(existing).pipe(Effect.option);
         if (Option.getOrUndefined(target) !== launcher) {
-          return yield* logInfo("left another s3code app's s3code command in place", {
+          return yield* logInfo("left another S3 Code app's s3code command in place", {
             existing,
           });
         }

@@ -201,9 +201,9 @@ describe("DesktopAppIdentity", () => {
 
         const runtimeName = calls.setName[0];
         assert.isDefined(runtimeName);
-        assert.equal(runtimeName, `s3code ${stage}`);
+        assert.equal(runtimeName, `S3 Code ${stage}`);
         assert.match(runtimeName.replaceAll(" ", ""), /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/);
-        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, `s3code (${stage})`);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, `S3 Code (${stage})`);
       }),
       { calls, environment },
     );

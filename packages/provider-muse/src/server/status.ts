@@ -48,7 +48,7 @@ export const makePendingMuseProvider = Effect.fn("makePendingMuseProvider")(func
       auth: { status: "unknown" },
       message: settings.enabled
         ? "Checking Muse Code CLI availability..."
-        : "Muse Code is disabled in s3code settings.",
+        : "Muse Code is disabled in S3 Code settings.",
     },
   });
 });

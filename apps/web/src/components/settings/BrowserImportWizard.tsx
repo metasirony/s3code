@@ -264,9 +264,9 @@ function FullDiskAccessStep({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Let s3code read {source.name}&rsquo;s cookies</DialogTitle>
+        <DialogTitle>Let S3 Code read {source.name}&rsquo;s cookies</DialogTitle>
         <DialogDescription>
-          To import cookies from {source.name}, s3code needs Full Disk Access. Turn it on in System
+          To import cookies from {source.name}, S3 Code needs Full Disk Access. Turn it on in System
           Settings, then come back to finish the import. You can revoke it again once the import is
           done.
         </DialogDescription>
@@ -298,8 +298,8 @@ function FullDiskAccessStep({
         {!permission.isReady(["fullDiskAccess"]) ? (
           <p className="mt-3 text-xs text-muted-foreground">
             {stillRequired
-              ? "Access is still required. Quit and reopen s3code if you just allowed it, then retry the import."
-              : "If access doesn't update after you allow it, quit and reopen s3code, then retry the import."}
+              ? "Access is still required. Quit and reopen S3 Code if you just allowed it, then retry the import."
+              : "If access doesn't update after you allow it, quit and reopen S3 Code, then retry the import."}
           </p>
         ) : null}
       </DialogPanel>

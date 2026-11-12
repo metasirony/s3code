@@ -186,7 +186,7 @@ const installFromArchive = Effect.fn("cloud.pinned_runtime.install_archive")(fun
   const platformKey = cliArchivePlatformKey(input.platform, input.arch);
   if (platformKey === undefined) {
     return yield* new PinnedRuntimeInstallError({
-      step: `selecting a s3code release archive for ${input.platform}-${input.arch}`,
+      step: `selecting an S3 Code release archive for ${input.platform}-${input.arch}`,
     });
   }
   const httpClient = input.httpClient;
@@ -195,18 +195,18 @@ const installFromArchive = Effect.fn("cloud.pinned_runtime.install_archive")(fun
   const archive = yield* fetchReleaseAsset(
     httpClient,
     cliReleaseAssetUrl(input.version, fileName, input.releaseBaseUrl),
-    "downloading the s3code release archive",
+    "downloading the S3 Code release archive",
     input.onProgress,
   );
   input.onProgress?.({ stage: "verify" });
   const digest = yield* Effect.tryPromise({
     try: () => crypto.subtle.digest("SHA-256", archive),
     catch: (cause) =>
-      new PinnedRuntimeInstallError({ step: "verifying the s3code release archive", cause }),
+      new PinnedRuntimeInstallError({ step: "verifying the S3 Code release archive", cause }),
   });
   if (Hex.encode(new Uint8Array(digest)) !== expected) {
     return yield* new PinnedRuntimeInstallError({
-      step: "verifying the s3code release archive checksum",
+      step: "verifying the S3 Code release archive checksum",
     });
   }
 
@@ -216,11 +216,11 @@ const installFromArchive = Effect.fn("cloud.pinned_runtime.install_archive")(fun
     .pipe(
       Effect.mapError(
         (cause) =>
-          new PinnedRuntimeInstallError({ step: "writing the s3code release archive", cause }),
+          new PinnedRuntimeInstallError({ step: "writing the S3 Code release archive", cause }),
       ),
     );
   input.onProgress?.({ stage: "extract" });
-  const extractStep = "extracting the s3code release archive";
+  const extractStep = "extracting the S3 Code release archive";
   // Strip the archive's stem directory so the executable lands at <versionDir>/s3code.
   yield* input.runner
     .run({
@@ -255,14 +255,14 @@ const publishedArchive = Effect.fn("cloud.pinned_runtime.published_archive")(fun
       yield* fetchReleaseAsset(
         input.httpClient,
         cliReleaseAssetUrl(input.version, CLI_RELEASE_CHECKSUMS_FILE, input.releaseBaseUrl),
-        "downloading the s3code release checksums",
+        "downloading the S3 Code release checksums",
       ),
     ),
   );
   const expected = checksums.get(fileName);
   if (expected === undefined) {
     return yield* new PinnedRuntimeInstallError({
-      step: `finding ${fileName} in the s3code release checksums`,
+      step: `finding ${fileName} in the S3 Code release checksums`,
     });
   }
   return { fileName, expected };
@@ -274,7 +274,7 @@ const isPinnedRuntimeInstallError = Schema.is(PinnedRuntimeInstallError);
 export const isUnpublishedRelease = (error: unknown): error is PinnedRuntimeInstallError =>
   isPinnedRuntimeInstallError(error) &&
   (error.step.startsWith("finding ") ||
-    (error.step.startsWith("downloading the s3code release") &&
+    (error.step.startsWith("downloading the S3 Code release") &&
       HttpClientError.isHttpClientError(error.cause) &&
       error.cause.response?.status === 404));
 
@@ -299,7 +299,7 @@ const installPinnedRuntime = Effect.fn("cloud.pinned_runtime.ensure_installed")(
       const platformKey = cliArchivePlatformKey(input.platform, input.arch);
       if (platformKey === undefined) {
         return yield* new PinnedRuntimeInstallError({
-          step: `selecting a s3code release archive for ${input.platform}-${input.arch}`,
+          step: `selecting an S3 Code release archive for ${input.platform}-${input.arch}`,
         });
       }
       yield* publishedArchive(input, platformKey);
@@ -673,7 +673,7 @@ const selectUnusedRuntimes = Effect.fn("cloud.pinned_runtime.select_unused")(fun
       Effect.andThen(fs.rename(versionDir, target)),
       Effect.andThen(Effect.sync(() => pruned.add(target))),
       Effect.catch((cause) =>
-        Effect.logWarning("Could not remove an unused s3code runtime.", { version, cause }),
+        Effect.logWarning("Could not remove an unused S3 Code runtime.", { version, cause }),
       ),
     );
   }
@@ -705,7 +705,7 @@ export const prunePinnedRuntimes = Effect.fn("cloud.pinned_runtime.prune")(funct
         ),
       ),
       Effect.catch((cause) =>
-        Effect.logWarning("Could not remove an unused s3code runtime.", { target, cause }),
+        Effect.logWarning("Could not remove an unused S3 Code runtime.", { target, cause }),
       ),
     );
   }

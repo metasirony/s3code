@@ -81,11 +81,11 @@ export function resolveProviderCompatibility(
       : "unknown";
   const message =
     status === "broken"
-      ? "This provider version is known to be incompatible with this s3code release."
+      ? "This provider version is known to be incompatible with this S3 Code release."
       : status === "unsupported"
-        ? "This provider version is outside the supported range for this s3code release."
+        ? "This provider version is outside the supported range for this S3 Code release."
         : status === "graceful"
-          ? "This provider version has limited compatibility with this s3code release."
+          ? "This provider version has limited compatibility with this S3 Code release."
           : null;
   const recommendedVersion = policy.recommendedVersion ?? null;
   const recommendedRange = policy.recommendedRange ?? null;

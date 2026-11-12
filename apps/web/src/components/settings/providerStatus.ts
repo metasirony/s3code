@@ -55,7 +55,7 @@ export function getProviderSummary(provider: ServerProvider | undefined) {
     return {
       headline: "Disabled",
       detail:
-        provider.message ?? "This provider is installed but disabled for new sessions in s3code.",
+        provider.message ?? "This provider is installed but disabled for new sessions in S3 Code.",
     };
   }
   if (!provider.installed) {

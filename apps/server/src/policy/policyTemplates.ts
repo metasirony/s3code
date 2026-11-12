@@ -53,7 +53,7 @@ const policies = (): ReadonlyArray<Policy> => [
   {
     id: "Organization",
     title: "Organization",
-    help: 'Required whenever any other s3code policy is set: s3code will not start with policies that do not name an organization.\n\nUsers see the name as "Managed by <organization>" beside every control the policy locks. The support URL is optional.',
+    help: 'Required whenever any other S3 Code policy is set: S3 Code will not start with policies that do not name an organization.\n\nUsers see the name as "Managed by <organization>" beside every control the policy locks. The support URL is optional.',
     elements: [
       { kind: "text", name: "Organization", label: "Organization name" },
       { kind: "text", name: "SupportUrl", label: "Support URL (optional)" },
@@ -76,7 +76,7 @@ const policies = (): ReadonlyArray<Policy> => [
   {
     id: "Clients",
     title: "Allowed clients",
-    help: "What may connect to s3code on this machine.\n\nWithout Remote, s3code only listens on this machine, does not create pairing links, signs out devices that paired earlier, and turns T3 Connect off. Check at least one client.\n\nDisabled or Not Configured: no restriction.",
+    help: "What may connect to S3 Code on this machine.\n\nWithout Remote, S3 Code only listens on this machine, does not create pairing links, signs out devices that paired earlier, and turns T3 Connect off. Check at least one client.\n\nDisabled or Not Configured: no restriction.",
     elements: [
       {
         kind: "checkbox",
@@ -116,13 +116,13 @@ const policies = (): ReadonlyArray<Policy> => [
   {
     id: "BrowserCookieImport",
     title: "Allow importing browser cookies",
-    help: "Disabled stops users from importing cookies from another browser into s3code's browser.",
+    help: "Disabled stops users from importing cookies from another browser into S3 Code's browser.",
     toggle: "BrowserCookieImport",
   },
   {
     id: "Telemetry",
     title: "Allow usage data",
-    help: "Disabled stops s3code from sending product usage data and relay connection traces. Enabled cannot turn them on for a user who turned them off.",
+    help: "Disabled stops S3 Code from sending product usage data and relay connection traces. Enabled cannot turn them on for a user who turned them off.",
     toggle: "Telemetry",
   },
   {
@@ -140,7 +140,7 @@ const policies = (): ReadonlyArray<Policy> => [
   {
     id: "Updates",
     title: "Updates",
-    help: "Off stops s3code from checking for updates, for machines that receive s3code through device management.\n\nA feed URL makes the desktop app update from your own mirror of the release feed instead of GitHub; it must be https. Unchecking nightly makes the nightly channel unavailable.\n\nDisabled or Not Configured: no restriction.",
+    help: "Off stops S3 Code from checking for updates, for machines that receive S3 Code through device management.\n\nA feed URL makes the desktop app update from your own mirror of the release feed instead of GitHub; it must be https. Unchecking nightly makes the nightly channel unavailable.\n\nDisabled or Not Configured: no restriction.",
     elements: [
       {
         kind: "enum",
@@ -164,13 +164,13 @@ const policies = (): ReadonlyArray<Policy> => [
   {
     id: "Settings",
     title: "Managed settings (JSON)",
-    help: 'Defaults and locks for server settings, as the "settings" object of a s3code policy. Each key is a setting path; each value is {"value": ..., "locked": true|false}.\n\nExample: {"enableAgentBrowserAccess": {"value": false, "locked": true}}\n\nRun "t3 policy check" on a policy file with the same object to validate it first.',
+    help: 'Defaults and locks for server settings, as the "settings" object of a S3 Code policy. Each key is a setting path; each value is {"value": ..., "locked": true|false}.\n\nExample: {"enableAgentBrowserAccess": {"value": false, "locked": true}}\n\nRun "t3 policy check" on a policy file with the same object to validate it first.',
     elements: [{ kind: "text", name: "Settings", label: "Settings JSON", json: true }],
   },
   {
     id: "ProviderInstances",
     title: "Provider settings (JSON)",
-    help: 'Fields set on every instance of a provider, as the "limits.providers.instances" object of a s3code policy: environment variables, binaryPath, launchArgs.\n\nExample: {"claudeAgent": {"locked": true, "environment": [{"name": "CLAUDE_CODE_USE_BEDROCK", "value": "1"}]}}\n\nEvery user on the machine can read this value, so do not put credentials in it.',
+    help: 'Fields set on every instance of a provider, as the "limits.providers.instances" object of a S3 Code policy: environment variables, binaryPath, launchArgs.\n\nExample: {"claudeAgent": {"locked": true, "environment": [{"name": "CLAUDE_CODE_USE_BEDROCK", "value": "1"}]}}\n\nEvery user on the machine can read this value, so do not put credentials in it.',
     elements: [
       { kind: "text", name: "ProviderInstances", label: "Provider settings JSON", json: true },
     ],
@@ -270,8 +270,8 @@ const presentationElement = (element: Element) => {
 /** The en-US strings and dialog layouts for `windowsAdmx`. */
 export function windowsAdml(): string {
   const strings: Array<readonly [string, string]> = [
-    ["s3code", "s3code"],
-    ["SUPPORTED_s3code", "s3code with managed policy support"],
+    ["s3code", "S3 Code"],
+    ["SUPPORTED_s3code", "S3 Code with managed policy support"],
   ];
   const presentations: Array<string> = [];
   for (const policy of policies()) {
@@ -291,8 +291,8 @@ export function windowsAdml(): string {
   }
   return `<?xml version="1.0" encoding="utf-8"?>
 <policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
-  <displayName>s3code</displayName>
-  <description>Policies for s3code</description>
+  <displayName>S3 Code</displayName>
+  <description>Policies for S3 Code</description>
   <resources>
     <stringTable>
 ${strings.map(([id, text]) => `      <string id="${id}">${escapeXml(text)}</string>`).join("\n")}
@@ -357,7 +357,7 @@ export function macosProfile(
   const profile = {
     PayloadContent: [
       {
-        PayloadDisplayName: "s3code policy",
+        PayloadDisplayName: "S3 Code policy",
         PayloadIdentifier: `io.github.metasirony.s3code.policy.${uuids.payload}`,
         PayloadType: "io.github.metasirony.s3code",
         PayloadUUID: uuids.payload,
@@ -365,7 +365,7 @@ export function macosProfile(
         ...document,
       },
     ],
-    PayloadDescription: "Configures s3code for every user on this Mac.",
+    PayloadDescription: "Configures S3 Code for every user on this Mac.",
     PayloadDisplayName: `s3code policy for ${document.organization}`,
     PayloadIdentifier: `io.github.metasirony.s3code.policy`,
     PayloadOrganization: document.organization,

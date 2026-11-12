@@ -47,7 +47,7 @@ function summarize(
         prompt.value === null
           ? {
               title: "Open this thread",
-              description: "It opens in s3code if you're connected to the machine it runs on.",
+              description: "It opens in S3 Code if you're connected to the machine it runs on.",
               prompt: null,
               details: [],
             }
@@ -149,7 +149,7 @@ function HostedPromptLinkLanding({
         <Alert className="mt-5" variant="error">
           <AlertTitle>This prompt had hidden characters, it may be malicious</AlertTitle>
           <AlertDescription>
-            s3code removed {prompt.hiddenCharacters} hidden character
+            S3 Code removed {prompt.hiddenCharacters} hidden character
             {prompt.hiddenCharacters === 1 ? "" : "s"}. Read the prompt before you send it.
           </AlertDescription>
         </Alert>

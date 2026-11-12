@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "s3code",
-  "short_name": "s3code",
+  "name": "S3 Code",
+  "short_name": "S3 Code",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

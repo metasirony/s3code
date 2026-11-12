@@ -1163,7 +1163,7 @@ export const make = Effect.gen(function* () {
           };
         }
         default:
-          return yield* failure(input.action, `GitCafe cannot ${input.action} from s3code.`);
+          return yield* failure(input.action, `GitCafe cannot ${input.action} from S3 Code.`);
       }
     }),
     updateChangeRequest: Effect.fn("GitCafePullRequestProvider.updateChangeRequest")(

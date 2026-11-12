@@ -364,7 +364,7 @@ fn run() -> Result<()> {
                 ),
             )?;
             if serde_json::from_str::<serde_json::Value>(&value)?["activated"] != true {
-                return Err("KDE could not identify the s3code window to activate".into());
+                return Err("KDE could not identify the S3 Code window to activate".into());
             }
             println!("{{\"activated\":true}}");
         }

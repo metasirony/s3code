@@ -37,7 +37,7 @@ interface Props {
 const { locale = DEFAULT_LOCALE, localizedPath } = Astro.props;
 const t = messagesFor(locale).layout;
 const {
-  title = `s3code · ${t.defaultTitle}`,
+  title = `S3 Code · ${t.defaultTitle}`,
   description = t.defaultDescription,
   pageClass,
   jsonLd = [],
@@ -106,10 +106,10 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site);
   </head>
   <body>
     <div class:list={["page", pageClass]}>
-      <aside class="fork-notice">s3code is a fork of <a href="https://github.com/pingdotgg/t3code">T3 Code</a>. The documentation, screenshots and download links below describe the upstream project.</aside>
+      <aside class="fork-notice">S3 Code is a fork of <a href="https://github.com/pingdotgg/t3code">T3 Code</a>. The documentation, screenshots and download links below describe the upstream project.</aside>
       <nav class="nav">
         <div class="nav-inner">
-          <a href={homeHref} class="nav-brand" aria-label="s3code home">
+          <a href={homeHref} class="nav-brand" aria-label="S3 Code home">
             <svg
               class="nav-brand-mark"
               viewBox="16.6509 37 93.2741 56.96"
@@ -118,7 +118,7 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site);
             >
               <path d="M39.4509 93.96 Q32.7309 93.96 26.5709 92.16 Q20.4109 90.36 16.6509 87.48 L21.0509 77.72 Q24.5709 80.28 29.5309 81.92 Q34.4909 83.56 39.5309 83.56 Q45.2909 83.56 47.8109 81.88 Q50.3309 80.2 50.3309 77.56 Q50.3309 75.32 48.5709 74 Q46.8109 72.68 43.8909 71.84 Q40.9709 71 37.5309 70.24 Q34.0909 69.48 30.6109 68.4 Q27.1309 67.32 24.2109 65.52 Q21.2909 63.72 19.5309 60.8 Q17.7709 57.88 17.7709 53.48 C17.7709 42.5 25.2509 37 38.1009 37 H63.2109 V47.4 H40.9009 C34.0009 47.4 30.6509 49 30.6509 52.84 Q30.6509 55 32.4109 56.32 Q34.1709 57.64 37.0509 58.48 Q39.9309 59.32 43.4109 60.04 Q46.8909 60.76 50.3709 61.84 Q53.8509 62.92 56.7709 64.68 Q59.6909 66.44 61.4509 69.32 Q63.2109 72.2 63.2109 76.6 Q63.2109 81.32 60.6109 85.24 Q58.0109 89.16 52.7309 91.56 Q47.4509 93.96 39.4509 93.96 Z M86.7253 93.96C82.832 93.96 78.9653 93.4533 75.1253 92.44C71.2853 91.3733 68.032 89.88 65.3653 87.96L70.4053 78.04C72.5386 79.5867 75.0186 80.8133 77.8453 81.72C80.672 82.6267 83.5253 83.08 86.4053 83.08C89.6586 83.08 92.2186 82.44 94.0853 81.16C95.952 79.88 96.8853 78.12 96.8853 75.88C96.8853 73.7467 96.0586 72.0667 94.4053 70.84C92.752 69.6133 90.0853 69 86.4053 69H80.4853V60.44L96.0853 42.76L97.5253 47.4H68.1653V37H107.365V45.4L91.8453 63.08L85.2853 59.32H89.0453C95.9253 59.32 101.125 60.8667 104.645 63.96C108.165 67.0533 109.925 71.0267 109.925 75.88C109.925 79.0267 109.099 81.9867 107.445 84.76C105.792 87.48 103.259 89.6933 99.8453 91.4C96.432 93.1067 92.0586 93.96 86.7253 93.96Z" />
             </svg>
-            <span class="nav-brand-name">code</span>
+            <span class="nav-brand-name">Code</span>
           </a>
           <div class="nav-right">
             {localizedPath && (

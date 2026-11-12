@@ -58,7 +58,7 @@ export class ThreadServerNotRunningError extends Schema.TaggedError<ThreadServer
 ) {
   override readonly [Runtime.errorReported] = false;
   override get message(): string {
-    return `No running s3code server uses ${this.baseDir}. Start s3code, then retry.`;
+    return `No running S3 Code server uses ${this.baseDir}. Start S3 Code, then retry.`;
   }
 }
 
@@ -69,7 +69,7 @@ export class ThreadServerUnreachableError extends Schema.TaggedError<ThreadServe
   override readonly [Runtime.errorReported] = false;
   override get message(): string {
     const reason = this.cause instanceof Error ? ` ${this.cause.message}` : "";
-    return `Could not reach the s3code server at ${this.origin}.${reason}`;
+    return `Could not reach the S3 Code server at ${this.origin}.${reason}`;
   }
 }
 
@@ -98,7 +98,7 @@ export class ThreadProjectNotFoundError extends Schema.TaggedError<ThreadProject
 ) {
   override readonly [Runtime.errorReported] = false;
   override get message(): string {
-    return `No s3code project matches '${this.identifier}'. Pass a project id or a path inside a project.`;
+    return `No S3 Code project matches '${this.identifier}'. Pass a project id or a path inside a project.`;
   }
 }
 
@@ -111,7 +111,7 @@ export class ThreadNeedsInputError extends Schema.TaggedError<ThreadNeedsInputEr
   override readonly [Runtime.errorExitCode] = 2;
 
   override get message(): string {
-    return `Thread ${this.threadId} is waiting for an answer. Open it in s3code to respond.`;
+    return `Thread ${this.threadId} is waiting for an answer. Open it in S3 Code to respond.`;
   }
 }
 

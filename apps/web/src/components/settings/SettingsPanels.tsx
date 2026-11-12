@@ -2253,7 +2253,7 @@ export function AboutSettingsPanel() {
           {...searchableSetting("privacy-policy")}
           description={
             telemetryOff === undefined
-              ? "How we handle your data, including the anonymous usage data s3code collects."
+              ? "How we handle your data, including the anonymous usage data S3 Code collects."
               : `How we handle your data. ${telemetryOff}`
           }
           control={
@@ -2268,7 +2268,7 @@ export function AboutSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("open-source-licenses")}
-          description="Notices for dependencies, assets, and optional tools used by s3code."
+          description="Notices for dependencies, assets, and optional tools used by S3 Code."
           control={
             <Button
               render={<Link to="/settings/open-source-licenses" />}

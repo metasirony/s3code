@@ -162,7 +162,7 @@ export async function startDesktopAppControlServer(input: {
       activeRequestId = parsed.requestId;
       void input.handle(parsed).then(finish, () => {
         finish(
-          invalidResponse(parsed.requestId, "s3code could not process the desktop app request."),
+          invalidResponse(parsed.requestId, "S3 Code could not process the desktop app request."),
         );
       });
     });

@@ -1984,7 +1984,7 @@ function renderFeedEntry(
         >
           {presentation.attribution === "t3code" ? (
             <Text className="mb-1 pr-1 font-t3-medium text-2xs text-foreground-muted opacity-60">
-              Sent by s3code
+              Sent by S3 Code
             </Text>
           ) : null}
           {presentation.guestName !== undefined ? (

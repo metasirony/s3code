@@ -76,7 +76,7 @@ export function UseInAnotherAppDialogHost() {
 
 function UseInAnotherAppDialog({ requested }: { readonly requested: EnvironmentId | null }) {
   const { environment, label } = useAccessEnvironment(requested);
-  const title = `Use s3code in another app (MCP) · ${label ?? "s3code"}`;
+  const title = `Use S3 Code in another app (MCP) · ${label ?? "S3 Code"}`;
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : close())}>
       <WizardPopup>
@@ -411,7 +411,7 @@ function GateScreen({
         </GateMessage>
       );
     case "update":
-      return <GateMessage title={`Update s3code on ${name}`} />;
+      return <GateMessage title={`Update S3 Code on ${name}`} />;
     case "no-relay-read":
       return (
         <GateMessage
@@ -470,7 +470,7 @@ function GateScreen({
           ) : (
             <div className="space-y-2 text-sm">
               <CommandBlock command="t3 connect link" />
-              <p>Restart s3code on {name}.</p>
+              <p>Restart S3 Code on {name}.</p>
               {checkAgain}
             </div>
           )}

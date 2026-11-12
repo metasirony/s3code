@@ -20,6 +20,7 @@
       ${If} $1 == "s3code"
       ${OrIf} $1 == "s3code (Beta)"
       ${OrIf} $1 == "s3code (Nightly)"
+        ${T3StrRep} $1 $1 "s3code" "S3 Code"
         ${T3StrRep} $appRunningMessage $appRunningMessage "${PRODUCT_NAME}" $1
         ${T3StrRep} $appClosingMessage $appClosingMessage "${PRODUCT_NAME}" $1
         ${T3StrRep} $appCannotBeClosedMessage $appCannotBeClosedMessage "${PRODUCT_NAME}" $1

@@ -3,14 +3,14 @@
   <id>io.github.metasirony.s3code</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
-  <name>s3code</name>
+  <name>S3 Code</name>
   <summary>Desktop GUI for coding agents</summary>
   <developer id="io.github.metasirony">
     <name>metasirony (fork of T3 Code by T3 Tools Inc.)</name>
   </developer>
   <description>
     <p>
-      s3code is an open-source desktop app for coding agents. Work with your
+      S3 Code is an open-source desktop app for coding agents. Work with your
       existing agent subscriptions, review code changes, and run commands in
       your projects.
     </p>

@@ -42,7 +42,7 @@ export class CaptureService {
           break;
         }
       }
-      if (!allowed) throw new Error("Only s3code may request a snapshot.");
+      if (!allowed) throw new Error("Only S3 Code may request a snapshot.");
       const pid = options ? await this._getProcessId(sender) : undefined;
       this._checkSession();
       const snapshot = await this._takeSnapshot(options?.animate ?? false);

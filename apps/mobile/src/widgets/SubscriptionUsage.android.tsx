@@ -41,10 +41,16 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
     : getMaterialColors({ scheme: appearance });
   const muted = colors.onSurfaceVariant;
   const providers = props.providers ?? [
-    { name: "Codex", detail: "Open s3code to connect", windows: [], expiresAt: 0, totalWindows: 0 },
+    {
+      name: "Codex",
+      detail: "Open S3 Code to connect",
+      windows: [],
+      expiresAt: 0,
+      totalWindows: 0,
+    },
     {
       name: "Claude",
-      detail: "Open s3code to connect",
+      detail: "Open S3 Code to connect",
       windows: [],
       expiresAt: 0,
       totalWindows: 0,
@@ -77,7 +83,7 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
               </Text>
               {shown.length === 0 ? (
                 <Text color={muted} maxLines={1} style={{ fontSize: 11 }}>
-                  {stale ? "Open s3code to refresh" : provider.detail}
+                  {stale ? "Open S3 Code to refresh" : provider.detail}
                 </Text>
               ) : null}
               {shown.map((window) => {

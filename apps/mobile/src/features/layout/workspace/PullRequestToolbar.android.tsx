@@ -54,10 +54,10 @@ export function PullRequestToolbar(props: {
   }, [searching, closeSearch, navigation, isTabActive]);
   return (
     <AppBar
-      title="s3code"
+      title="S3 Code"
       titleContent={
         <WorkspaceBrandTitle
-          accessibilityLabel="s3code, Pull requests"
+          accessibilityLabel="S3 Code, Pull requests"
           onOpenEnvironments={() => openSettings(navigation, "SettingsEnvironments")}
         />
       }

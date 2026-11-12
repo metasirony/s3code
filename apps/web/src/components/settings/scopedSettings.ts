@@ -484,7 +484,7 @@ export async function persistScopedSettingsPatch(
       return [
         {
           ...environment,
-          message: "This environment does not support this setting. Update s3code on it.",
+          message: "This environment does not support this setting. Update S3 Code on it.",
         },
       ];
     }

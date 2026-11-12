@@ -13,7 +13,8 @@ const repoRoot = NodePath.resolve(desktopDir, "..", "..");
 const devBundleIdSuffix = NodePath.basename(repoRoot)
   .toLowerCase()
   .replaceAll(/[^a-z0-9]+/g, "");
-const APP_DISPLAY_NAME = isDevelopment ? "s3code (Dev)" : "s3code (Beta)";
+const APP_DISPLAY_NAME = isDevelopment ? "S3 Code (Dev)" : "S3 Code (Beta)";
+const APP_BUNDLE_NAME = isDevelopment ? "s3code (Dev)" : "s3code (Beta)";
 const APP_BUNDLE_ID = isDevelopment
   ? `io.github.metasirony.s3code.dev.${devBundleIdSuffix || "local"}`
   : "io.github.metasirony.s3code";
@@ -268,8 +269,8 @@ function resolveMacBundleInfoPlistStrings(executableName) {
     CFBundleExecutable: executableName,
     CFBundleIconFile: "icon.icns",
     NSScreenCaptureUsageDescription:
-      "s3code captures the active window when you use the snapshot shortcut.",
-    NSDocumentsFolderUsageDescription: "s3code reads project files you open in the desktop app.",
+      "S3 Code captures the active window when you use the snapshot shortcut.",
+    NSDocumentsFolderUsageDescription: "S3 Code reads project files you open in the desktop app.",
   };
 }
 
@@ -331,7 +332,7 @@ function readJson(path) {
   }
 }
 
-export function resolveMacLauncherPaths(appBundlePath, displayName = APP_DISPLAY_NAME) {
+export function resolveMacLauncherPaths(appBundlePath, displayName = APP_BUNDLE_NAME) {
   const executableDir = NodePath.posix.join(appBundlePath, "Contents", "MacOS");
   const launcherExecutableName = `${displayName} Launcher`;
   return {
@@ -344,7 +345,7 @@ export function resolveMacLauncherPaths(appBundlePath, displayName = APP_DISPLAY
 function buildMacLauncher(electronBinaryPath) {
   const sourceAppBundlePath = NodePath.resolve(NodePath.dirname(electronBinaryPath), "../..");
   const runtimeDir = NodePath.join(desktopDir, ".electron-runtime");
-  const targetAppBundlePath = NodePath.join(runtimeDir, `${APP_DISPLAY_NAME}.app`);
+  const targetAppBundlePath = NodePath.join(runtimeDir, `${APP_BUNDLE_NAME}.app`);
   const developmentPaths = resolveMacLauncherPaths(targetAppBundlePath);
   const runtimeElectronBinaryPath = developmentPaths.runtimeElectronBinaryPath;
   const launcherBinaryPath = isDevelopment

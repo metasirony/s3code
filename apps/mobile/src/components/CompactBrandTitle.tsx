@@ -39,7 +39,7 @@ export function CompactBrandTitle(
         props.fit && showStage ? (event) => setFullWidth(event.nativeEvent.layout.width) : undefined
       }
       aria-level={1}
-      accessibilityLabel={props.accessibilityLabel ?? "s3code, Threads"}
+      accessibilityLabel={props.accessibilityLabel ?? "S3 Code, Threads"}
       accessible
       role="heading"
       className="flex-row items-center gap-1.5"
@@ -57,7 +57,7 @@ export function CompactBrandTitle(
         className="font-t3-medium text-foreground-muted"
         style={{ fontSize: 21 * scale, letterSpacing: -0.5 * scale }}
       >
-        code
+        Code
       </Text>
       {showStage ? (
         <View

@@ -105,7 +105,7 @@ export const buildInitialKiroProviderSnapshot = Effect.fn(
     auth: { status: "unknown" },
     message: settings.enabled
       ? "Checking Kiro CLI availability..."
-      : "Kiro is disabled in s3code settings.",
+      : "Kiro is disabled in S3 Code settings.",
   });
 });
 
@@ -370,7 +370,7 @@ export const checkKiroProviderStatus = Effect.fn("checkKiroProviderStatus")(func
       version: null,
       status: "warning",
       auth: { status: "unknown" },
-      message: "Kiro is disabled in s3code settings.",
+      message: "Kiro is disabled in S3 Code settings.",
     });
   }
 

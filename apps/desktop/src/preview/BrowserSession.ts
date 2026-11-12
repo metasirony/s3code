@@ -483,7 +483,7 @@ export const make = Effect.gen(function* BrowserSessionMake() {
                       Effect.andThen(
                         electronDialog.showErrorBox(
                           `Could not trust the certificate for ${host}`,
-                          "s3code could not save this approval, so the page stays blocked. Check that the disk is not full and its data folder is writable, then try again.",
+                          "S3 Code could not save this approval, so the page stays blocked. Check that the disk is not full and its data folder is writable, then try again.",
                         ),
                       ),
                       Effect.as(false),

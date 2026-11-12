@@ -93,7 +93,7 @@ function QueuedRunSender(props: {
             label: senderShell?.title.trim() || linkedSender?.title.trim() || "Agent",
           }
         : attribution === "t3code"
-          ? { icon: null, label: "Sent by s3code" }
+          ? { icon: null, label: "Sent by S3 Code" }
           : null;
   if (sender === null) return null;
   return (

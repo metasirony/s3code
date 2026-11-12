@@ -216,7 +216,7 @@ const serviceReconcileFlags = {
 
 const serviceInstallCommand = Command.make("install", serviceReconcileFlags).pipe(
   Command.withDescription(
-    "Install s3code as a background service for this user. `s3code up` also chooses how your other devices reach it.",
+    "Install S3 Code as a background service for this user. `s3code up` also chooses how your other devices reach it.",
   ),
   Command.withHandler((flags) =>
     runServiceCommand(
@@ -276,12 +276,12 @@ const serviceRestartCommand = Command.make("restart", projectLocationFlags).pipe
           status.installedVersion === undefined ? "" : ` on t3@${status.installedVersion}`;
         yield* Console.log(
           outcome === "restarted"
-            ? `Restarted the s3code service${onVersion}.`
+            ? `Restarted the S3 Code service${onVersion}.`
             : outcome === "queued"
-              ? `Queued a restart of the s3code service${onVersion}. This session runs inside the service and disconnects when it goes down.\nLogs: ${status.logPath}`
+              ? `Queued a restart of the S3 Code service${onVersion}. This session runs inside the service and disconnects when it goes down.\nLogs: ${status.logPath}`
               : status.otherBaseDir !== undefined
                 ? `The s3code service serves ${status.otherBaseDir}, so it was not restarted. Pass \`${BootService.formatBootServiceBaseDirOption(status.otherBaseDir)}\` to restart it.`
-                : "s3code service is not installed.",
+                : "S3 Code service is not installed.",
         );
       }),
     ),
@@ -289,7 +289,7 @@ const serviceRestartCommand = Command.make("restart", projectLocationFlags).pipe
 );
 
 const serviceUninstallCommand = Command.make("uninstall", projectLocationFlags).pipe(
-  Command.withDescription("Stop and remove the s3code background service."),
+  Command.withDescription("Stop and remove the S3 Code background service."),
   Command.withHandler((flags) =>
     runServiceCommand(
       flags,
@@ -313,7 +313,7 @@ const serviceUninstallCommand = Command.make("uninstall", projectLocationFlags).
         }
         const removed = yield* service.uninstall;
         yield* Console.log(
-          removed ? "Removed the s3code service." : "s3code service is not installed.",
+          removed ? "Removed the S3 Code service." : "S3 Code service is not installed.",
         );
       }),
     ),
@@ -321,7 +321,7 @@ const serviceUninstallCommand = Command.make("uninstall", projectLocationFlags).
 );
 
 const serviceStatusCommand = Command.make("status", projectLocationFlags).pipe(
-  Command.withDescription("Show whether the s3code background service is installed."),
+  Command.withDescription("Show whether the S3 Code background service is installed."),
   Command.withHandler((flags) =>
     runServiceCommand(
       flags,
@@ -361,7 +361,7 @@ const serviceProtectCommand = Command.make("protect", {
   ),
 }).pipe(
   Command.withDescription(
-    "Protect the s3code server from agents under memory pressure (Linux with systemd). Asks for sudo.",
+    "Protect the S3 Code server from agents under memory pressure (Linux with systemd). Asks for sudo.",
   ),
   Command.withHandler((flags) =>
     Effect.gen(function* () {
@@ -370,7 +370,7 @@ const serviceProtectCommand = Command.make("protect", {
       // Before resolving config, which creates T3 directories that root would then own.
       if ((yield* HostProcess.UserId) === 0) {
         return yield* Console.log(
-          "Run `s3code service protect` as the user that runs s3code, without sudo. It asks for sudo when it needs root.",
+          "Run `s3code service protect` as the user that runs S3 Code, without sudo. It asks for sudo when it needs root.",
         );
       }
       return yield* runServiceCommand(
@@ -393,7 +393,7 @@ const serviceProtectCommand = Command.make("protect", {
               }),
             );
             if (installed === undefined) {
-              return yield* Console.log("s3code service protection is not set up.");
+              return yield* Console.log("S3 Code service protection is not set up.");
             }
             yield* Console.log(
               [
@@ -404,7 +404,7 @@ const serviceProtectCommand = Command.make("protect", {
                 ),
               ].join("\n"),
             );
-            if (!(yield* confirm(flags.yes, "Remove s3code service protection?"))) return;
+            if (!(yield* confirm(flags.yes, "Remove S3 Code service protection?"))) return;
             yield* ServiceProtection.removeProtection(installed);
             return yield* Console.log(
               "Removed s3code service protection. The server's OOM score returns to normal after `s3code service restart`.",
@@ -413,8 +413,8 @@ const serviceProtectCommand = Command.make("protect", {
 
           yield* Console.log(
             [
-              "Keeps s3code running when agents fill this machine's memory:",
-              "  - reserves memory for the s3code server, so the kernel takes memory from agents first",
+              "Keeps S3 Code running when agents fill this machine's memory:",
+              "  - reserves memory for the S3 Code server, so the kernel takes memory from agents first",
               "  - makes the out-of-memory killer pick agents before the server",
               "It adds systemd drop-in files and changes nothing else. Undo with `s3code service protect --undo`.",
             ].join("\n"),
@@ -451,7 +451,7 @@ const serviceProtectCommand = Command.make("protect", {
 );
 
 export const serviceCommand = Command.make("service").pipe(
-  Command.withDescription("Manage the s3code background service."),
+  Command.withDescription("Manage the S3 Code background service."),
   Command.withSubcommands([
     serviceInstallCommand,
     serviceRestartCommand,

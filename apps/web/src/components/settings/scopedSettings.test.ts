@@ -264,7 +264,7 @@ describe("scoped settings writes", () => {
     const unsupported = [
       {
         label: server.label,
-        message: "This environment does not support this setting. Update s3code on it.",
+        message: "This environment does not support this setting. Update S3 Code on it.",
       },
     ];
 

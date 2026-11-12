@@ -1,4 +1,4 @@
-export const PRODUCT_NAME = "s3code";
+export const PRODUCT_NAME = "S3 Code";
 
 export const BRAND_MARK_VIEW_BOX = "16.6509 37 93.2741 56.96";
 export const BRAND_MARK_ASPECT_RATIO = 93.2741 / 56.96;

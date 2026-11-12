@@ -83,7 +83,7 @@ export const makeProviderAuthService = Effect.gen(function* () {
         instanceId,
         operation,
         detail: instance
-          ? "This provider does not support sign-in in s3code."
+          ? "This provider does not support sign-in in S3 Code."
           : "This provider instance is no longer available.",
       });
     }

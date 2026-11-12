@@ -596,7 +596,7 @@ describe("providerMaintenanceRunner", () => {
         // The registry reports no new version, so a command that exits 0 ends as "unchanged".
         assert.strictEqual(
           result.providers[0]?.updateState?.message,
-          "Update command completed, but s3code still detects an outdated provider version.",
+          "Update command completed, but S3 Code still detects an outdated provider version.",
         );
       }).pipe(
         Effect.provide(

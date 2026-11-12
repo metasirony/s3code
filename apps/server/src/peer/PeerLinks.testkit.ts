@@ -177,7 +177,7 @@ export const servePeer = <E, R>(
           Effect.map((sessions) =>
             sessions.filter(
               (session) =>
-                session.client.label?.startsWith("s3code · ") ||
+                session.client.label?.startsWith("S3 Code · ") ||
                 session.client.label?.startsWith("T3 Code · "),
             ),
           ),
