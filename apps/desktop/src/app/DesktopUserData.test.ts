@@ -36,6 +36,7 @@ it.effect.each([false, true])(
         yield* fs.readFileString(path.join(directory, "t3code-v2", "Local State")),
         state,
       );
+      yield* fs.makeDirectory(destination, { recursive: true });
       yield* fs.writeFileString(path.join(destination, "Local State"), "existing fork state");
       yield* resolveUserDataPath({ appDataDirectory: directory, isDevelopment, platform: "win32" });
       assert.equal(

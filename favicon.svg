@@ -1,0 +1,51 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="paper" x1="36" y1="0" x2="92" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67C2FF"/>
+      <stop offset="0.44" stop-color="#347FF8"/>
+      <stop offset="1" stop-color="#1538D0"/>
+    </linearGradient>
+    <radialGradient id="cyanGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(92 22) rotate(137) scale(78 70)">
+      <stop stop-color="#D4F6FF" stop-opacity="0.62"/>
+      <stop offset="0.52" stop-color="#65C8FF" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#276AF1" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="edgeShade" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(64 58) rotate(90) scale(77)">
+      <stop offset="0.68" stop-color="#102EBC" stop-opacity="0"/>
+      <stop offset="1" stop-color="#061A88" stop-opacity="0.48"/>
+    </radialGradient>
+    <pattern id="minorGrid" width="4" height="4" patternUnits="userSpaceOnUse">
+      <path d="M4 0H0V4" stroke="#D9F7FF" stroke-width="0.18" opacity="0.38"/>
+    </pattern>
+    <pattern id="majorGrid" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="url(#minorGrid)"/>
+      <path d="M16 0H0V16" stroke="#F0FCFF" stroke-width="0.34" opacity="0.52"/>
+    </pattern>
+    <clipPath id="frame">
+      <rect width="128" height="128" rx="10"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="128" height="128" fill="url(#paper)"/>
+    <rect width="128" height="128" fill="url(#cyanGlow)"/>
+    <rect x="4" y="4" width="120" height="120" fill="url(#majorGrid)" opacity="0.96"/>
+    <path d="M64 4V124M4 64H124" stroke="#F0FCFF" stroke-width="0.3" opacity="0.46"/>
+    <rect x="5.75" y="5.75" width="116.5" height="116.5" rx="5.5" stroke="#F1FCFF" stroke-width="0.5" opacity="0.66"/>
+
+    <g stroke="#BFE9F7" stroke-linecap="round" opacity="0.2">
+      <path d="M14 19L24 12M17 22L29 13" stroke-width="0.5"/>
+      <path d="M106 25L115 18M104 30L118 20" stroke-width="0.38"/>
+      <path d="M11 108L23 101M16 113L28 105" stroke-width="0.42"/>
+      <path d="M102 113L116 104M107 116L120 108" stroke-width="0.46"/>
+    </g>
+    <g fill="#D7F4FF" opacity="0.22">
+      <circle cx="18" cy="30" r="0.45"/>
+      <circle cx="112" cy="38" r="0.35"/>
+      <circle cx="22" cy="98" r="0.3"/>
+      <circle cx="109" cy="94" r="0.5"/>
+      <circle cx="94" cy="14" r="0.32"/>
+    </g>
+    <rect width="128" height="128" fill="url(#edgeShade)"/>
+  </g>
+<path d="M39.4509 93.96 Q32.7309 93.96 26.5709 92.16 Q20.4109 90.36 16.6509 87.48 L21.0509 77.72 Q24.5709 80.28 29.5309 81.92 Q34.4909 83.56 39.5309 83.56 Q45.2909 83.56 47.8109 81.88 Q50.3309 80.2 50.3309 77.56 Q50.3309 75.32 48.5709 74 Q46.8109 72.68 43.8909 71.84 Q40.9709 71 37.5309 70.24 Q34.0909 69.48 30.6109 68.4 Q27.1309 67.32 24.2109 65.52 Q21.2909 63.72 19.5309 60.8 Q17.7709 57.88 17.7709 53.48 C17.7709 42.5 25.2509 37 38.1009 37 H63.2109 V47.4 H40.9009 C34.0009 47.4 30.6509 49 30.6509 52.84 Q30.6509 55 32.4109 56.32 Q34.1709 57.64 37.0509 58.48 Q39.9309 59.32 43.4109 60.04 Q46.8909 60.76 50.3709 61.84 Q53.8509 62.92 56.7709 64.68 Q59.6909 66.44 61.4509 69.32 Q63.2109 72.2 63.2109 76.6 Q63.2109 81.32 60.6109 85.24 Q58.0109 89.16 52.7309 91.56 Q47.4509 93.96 39.4509 93.96 Z" fill="white"/><path d="M86.7253 93.96C82.832 93.96 78.9653 93.4533 75.1253 92.44C71.2853 91.3733 68.032 89.88 65.3653 87.96L70.4053 78.04C72.5386 79.5867 75.0186 80.8133 77.8453 81.72C80.672 82.6267 83.5253 83.08 86.4053 83.08C89.6586 83.08 92.2186 82.44 94.0853 81.16C95.952 79.88 96.8853 78.12 96.8853 75.88C96.8853 73.7467 96.0586 72.0667 94.4053 70.84C92.752 69.6133 90.0853 69 86.4053 69H80.4853V60.44L96.0853 42.76L97.5253 47.4H68.1653V37H107.365V45.4L91.8453 63.08L85.2853 59.32H89.0453C95.9253 59.32 101.125 60.8667 104.645 63.96C108.165 67.0533 109.925 71.0267 109.925 75.88C109.925 79.0267 109.099 81.9867 107.445 84.76C105.792 87.48 103.259 89.6933 99.8453 91.4C96.432 93.1067 92.0586 93.96 86.7253 93.96Z" fill="white"/></svg>
