@@ -22,13 +22,17 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer home
     const home = NodePath.join(root, homeName);
     const version = "1.2.3";
     const target = NodePath.join(home, "runtime/versions", version);
-    const launcher = NodePath.join(root, "bin/t3");
+    const launcher = NodePath.join(root, "bin/s3code");
     try {
       await NodeFSP.mkdir(target, { recursive: true });
       await NodeFSP.writeFile(NodePath.join(target, ".install-complete"), `${version}\n`);
-      await NodeFSP.writeFile(NodePath.join(target, "t3"), "#!/bin/sh\necho 't3 v1.2.3'\n", {
-        mode: 0o755,
-      });
+      await NodeFSP.writeFile(
+        NodePath.join(target, "s3code"),
+        "#!/bin/sh\necho 's3code v1.2.3'\n",
+        {
+          mode: 0o755,
+        },
+      );
       const { status, stdout, stderr } = NodeChildProcess.spawnSync(
         "sh",
         [NodePath.resolve(import.meta.dirname, "install.sh")],
@@ -46,14 +50,14 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer home
         },
       );
       expect(status, stdout + stderr).toBe(0);
-      expect(stderr).toContain(`Installed T3 Code ${version}`);
-      expect(await NodeFSP.readlink(launcher)).toBe(NodePath.join(target, "t3"));
+      expect(stderr).toContain(`Installed s3code ${version}`);
+      expect(await NodeFSP.readlink(launcher)).toBe(NodePath.join(target, "s3code"));
       expect(
         NodeChildProcess.execFileSync(launcher, ["--version"], {
           cwd: NodeOS.tmpdir(),
           encoding: "utf8",
         }).trim(),
-      ).toBe("t3 v1.2.3");
+      ).toBe("s3code v1.2.3");
     } finally {
       await NodeFSP.rm(temporaryRoot, { recursive: true, force: true });
     }
@@ -71,10 +75,10 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chan
     const server = NodeHttp.createServer((request, response) => {
       const url = new URL(request.url ?? "/", "http://fixture");
       const body =
-        url.pathname === "/pingdotgg/t3code/releases/latest" &&
+        url.pathname === "/metasirony/s3code/releases/latest" &&
         request.headers.accept === "application/json"
           ? { tag_name: "v1.2.3" }
-          : url.pathname === "/repos/pingdotgg/t3code/releases"
+          : url.pathname === "/repos/metasirony/s3code/releases"
             ? { "1": nightlies, "2": [{ tag_name: `v${version}` }, { tag_name: "v1.2.3" }] }[
                 url.searchParams.get("page") ?? ""
               ]
@@ -119,7 +123,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chan
         },
       );
       expect(code, output).toBe(0);
-      expect(output).toContain(`Installed T3 Code ${version}`);
+      expect(output).toContain(`Installed s3code ${version}`);
     } finally {
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -128,7 +132,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chan
   });
 });
 
-/** Runs an installer for a version that is already unpacked, so only the t3 command step runs. */
+/** Runs an installer for a version that is already unpacked, so only the s3code command step runs. */
 async function installOver(input: {
   readonly script: "install.sh" | "install.ps1";
   readonly home: string;
@@ -160,194 +164,202 @@ async function installOver(input: {
   return { code: result.status, output: `${result.stdout}${result.stderr}`, target };
 }
 
-describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("install.sh t3 command", () => {
-  it("replaces only this home's own links and prints a PATH command", async () => {
-    const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-install-link-"));
-    try {
-      const home = NodePath.join(root, "home");
-      const binDir = NodePath.join(root, "bin");
-      const link = NodePath.join(binDir, "t3");
-      await NodeFSP.mkdir(binDir, { recursive: true });
+describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")(
+  "install.sh s3code command",
+  () => {
+    it("replaces only this home's own links and prints a PATH command", async () => {
+      const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-install-link-"));
+      try {
+        const home = NodePath.join(root, "home");
+        const binDir = NodePath.join(root, "bin");
+        const link = NodePath.join(binDir, "s3code");
+        await NodeFSP.mkdir(binDir, { recursive: true });
 
-      await NodeFSP.writeFile(link, "#!/bin/sh\necho mine\n");
-      const foreign = await installOver({ script: "install.sh", home, binDir });
-      expect(foreign.code).not.toBe(0);
-      expect(foreign.output).toContain(`another t3 is already at ${link}`);
-      expect(await NodeFSP.readFile(link, "utf8")).toBe("#!/bin/sh\necho mine\n");
-      // Not even from inside the versions folder, where `.` would resolve into it.
-      const fromVersions = await installOver({
-        script: "install.sh",
-        home,
-        binDir,
-        cwd: foreign.target,
-      });
-      expect(fromVersions.code).not.toBe(0);
-      expect(await NodeFSP.readFile(link, "utf8")).toBe("#!/bin/sh\necho mine\n");
+        await NodeFSP.writeFile(link, "#!/bin/sh\necho mine\n");
+        const foreign = await installOver({ script: "install.sh", home, binDir });
+        expect(foreign.code).not.toBe(0);
+        expect(foreign.output).toContain(`another s3code is already at ${link}`);
+        expect(await NodeFSP.readFile(link, "utf8")).toBe("#!/bin/sh\necho mine\n");
+        // Not even from inside the versions folder, where `.` would resolve into it.
+        const fromVersions = await installOver({
+          script: "install.sh",
+          home,
+          binDir,
+          cwd: foreign.target,
+        });
+        expect(fromVersions.code).not.toBe(0);
+        expect(await NodeFSP.readFile(link, "utf8")).toBe("#!/bin/sh\necho mine\n");
 
-      // A link that only looks like it points into versions (join() would normalize the ..).
-      await NodeFSP.rm(link);
-      await NodeFSP.mkdir(NodePath.join(home, "other"), { recursive: true });
-      await NodeFSP.writeFile(NodePath.join(home, "other/t3"), "#!/bin/sh\n");
-      await NodeFSP.symlink(`${home}/runtime/versions/../../other/t3`, link);
-      const climbing = await installOver({ script: "install.sh", home, binDir });
-      expect(climbing.code).not.toBe(0);
-      expect(await NodeFSP.readlink(link)).toBe(`${home}/runtime/versions/../../other/t3`);
+        // A link that only looks like it points into versions (join() would normalize the ..).
+        await NodeFSP.rm(link);
+        await NodeFSP.mkdir(NodePath.join(home, "other"), { recursive: true });
+        await NodeFSP.writeFile(NodePath.join(home, "other/s3code"), "#!/bin/sh\n");
+        await NodeFSP.symlink(`${home}/runtime/versions/../../other/s3code`, link);
+        const climbing = await installOver({ script: "install.sh", home, binDir });
+        expect(climbing.code).not.toBe(0);
+        expect(await NodeFSP.readlink(link)).toBe(`${home}/runtime/versions/../../other/s3code`);
 
-      // Only `<version>/t3` counts, not another program inside a version.
-      await NodeFSP.rm(link);
-      await NodeFSP.symlink(NodePath.join(home, "runtime/versions/1.0.0/helper"), link);
-      const sibling = await installOver({ script: "install.sh", home, binDir });
-      expect(sibling.code).not.toBe(0);
-      expect(await NodeFSP.readlink(link)).toBe(
-        NodePath.join(home, "runtime/versions/1.0.0/helper"),
-      );
+        // Only `<version>/s3code` counts, not another program inside a version.
+        await NodeFSP.rm(link);
+        await NodeFSP.symlink(NodePath.join(home, "runtime/versions/1.0.0/helper"), link);
+        const sibling = await installOver({ script: "install.sh", home, binDir });
+        expect(sibling.code).not.toBe(0);
+        expect(await NodeFSP.readlink(link)).toBe(
+          NodePath.join(home, "runtime/versions/1.0.0/helper"),
+        );
 
-      // An upgrade over an older version's link, written through a symlinked T3 home.
-      await NodeFSP.rm(link);
-      await NodeFSP.symlink(NodePath.join(home, "runtime/versions/1.0.0/t3"), link);
-      await NodeFSP.symlink(home, NodePath.join(root, "alias"));
-      const upgrade = await installOver({
-        script: "install.sh",
-        home: NodePath.join(root, "alias"),
-        binDir,
-        env: { HOME: root, SHELL: "/bin/zsh", PATH: "/usr/bin:/bin" },
-      });
-      expect(upgrade.code, upgrade.output).toBe(0);
-      expect(await NodeFSP.readlink(link)).toBe(
-        NodePath.join(root, "alias/runtime/versions/1.2.3/t3"),
-      );
-      expect(upgrade.output).toContain(
-        `printf '\\n%s\\n' 'export PATH="$PATH:$HOME/bin"' >> ~/.zshrc`,
-      );
+        // An upgrade over an older version's link, written through a symlinked T3 home.
+        await NodeFSP.rm(link);
+        await NodeFSP.symlink(NodePath.join(home, "runtime/versions/1.0.0/s3code"), link);
+        await NodeFSP.symlink(home, NodePath.join(root, "alias"));
+        const upgrade = await installOver({
+          script: "install.sh",
+          home: NodePath.join(root, "alias"),
+          binDir,
+          env: { HOME: root, SHELL: "/bin/zsh", PATH: "/usr/bin:/bin" },
+        });
+        expect(upgrade.code, upgrade.output).toBe(0);
+        expect(await NodeFSP.readlink(link)).toBe(
+          NodePath.join(root, "alias/runtime/versions/1.2.3/s3code"),
+        );
+        expect(upgrade.output).toContain(
+          `printf '\\n%s\\n' 'export PATH="$PATH:$HOME/bin"' >> ~/.zshrc`,
+        );
 
-      // Containers and CI often have no SHELL; `set -u` must not stop the installer there.
-      const noShell = await installOver({
-        script: "install.sh",
-        home,
-        binDir,
-        env: { HOME: root, SHELL: undefined, PATH: "/usr/bin:/bin" },
-      });
-      expect(noShell.code, noShell.output).toBe(0);
-      expect(noShell.output).toContain(`Add ${binDir} to your PATH`);
+        // Containers and CI often have no SHELL; `set -u` must not stop the installer there.
+        const noShell = await installOver({
+          script: "install.sh",
+          home,
+          binDir,
+          env: { HOME: root, SHELL: undefined, PATH: "/usr/bin:/bin" },
+        });
+        expect(noShell.code, noShell.output).toBe(0);
+        expect(noShell.output).toContain(`Add ${binDir} to your PATH`);
 
-      // Its folder on PATH with a trailing slash is still this t3, not another one.
-      const slashed = await installOver({
-        script: "install.sh",
-        home,
-        binDir,
-        env: { HOME: root, PATH: `${binDir}/:/usr/bin:/bin` },
-      });
-      expect(slashed.code, slashed.output).toBe(0);
-      expect(slashed.output).toContain("Run t3 to use T3 Code here");
+        // Its folder on PATH with a trailing slash is still this s3code, not another one.
+        const slashed = await installOver({
+          script: "install.sh",
+          home,
+          binDir,
+          env: { HOME: root, PATH: `${binDir}/:/usr/bin:/bin` },
+        });
+        expect(slashed.code, slashed.output).toBe(0);
+        expect(slashed.output).toContain("Run s3code to use s3code here");
 
-      // A relative folder is made absolute, so the PATH command never follows the working directory.
-      const relative = await installOver({
-        script: "install.sh",
-        home,
-        binDir: "bin",
-        cwd: root,
-        env: { HOME: root, SHELL: "/bin/zsh", PATH: "/usr/bin:/bin" },
-      });
-      expect(relative.code, relative.output).toBe(0);
-      expect(relative.output).toContain(`'export PATH="$PATH:$HOME/bin"'`);
+        // A relative folder is made absolute, so the PATH command never follows the working directory.
+        const relative = await installOver({
+          script: "install.sh",
+          home,
+          binDir: "bin",
+          cwd: root,
+          env: { HOME: root, SHELL: "/bin/zsh", PATH: "/usr/bin:/bin" },
+        });
+        expect(relative.code, relative.output).toBe(0);
+        expect(relative.output).toContain(`'export PATH="$PATH:$HOME/bin"'`);
 
-      await NodeFSP.rm(link);
-      await NodeFSP.symlink(NodePath.join(home, "bin/t3"), link);
-      const overDesktop = await installOver({
-        script: "install.sh",
-        home: `${home}//`,
-        binDir: `${binDir}/`,
-      });
-      expect(overDesktop.code, overDesktop.output).toBe(0);
-      expect(await NodeFSP.readlink(link)).toBe(NodePath.join(home, "runtime/versions/1.2.3/t3"));
-    } finally {
-      await NodeFSP.rm(root, { recursive: true, force: true });
-    }
-  });
-});
+        await NodeFSP.rm(link);
+        await NodeFSP.symlink(NodePath.join(home, "bin/s3code"), link);
+        const overDesktop = await installOver({
+          script: "install.sh",
+          home: `${home}//`,
+          binDir: `${binDir}/`,
+        });
+        expect(overDesktop.code, overDesktop.output).toBe(0);
+        expect(await NodeFSP.readlink(link)).toBe(
+          NodePath.join(home, "runtime/versions/1.2.3/s3code"),
+        );
+      } finally {
+        await NodeFSP.rm(root, { recursive: true, force: true });
+      }
+    });
+  },
+);
 
-describe.skipIf(HostProcess.Platform.defaultValue() !== "win32")("install.ps1 t3 command", () => {
-  it("replaces only its own t3.cmd, also in non-ASCII and bracketed paths", async () => {
-    const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-install-ps1-"));
-    try {
-      // Windows PowerShell 5.1 reads files as ANSI by default and expands wildcards in paths.
-      const home = NodePath.join(root, "José", ".t3");
-      const binDir = NodePath.join(root, "bin[t3]");
-      const shim = NodePath.join(binDir, "t3.cmd");
-      await NodeFSP.mkdir(binDir, { recursive: true });
+describe.skipIf(HostProcess.Platform.defaultValue() !== "win32")(
+  "install.ps1 s3code command",
+  () => {
+    it("replaces only its own s3code.cmd, also in non-ASCII and bracketed paths", async () => {
+      const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-install-ps1-"));
+      try {
+        // Windows PowerShell 5.1 reads files as ANSI by default and expands wildcards in paths.
+        const home = NodePath.join(root, "JosГ©", ".s3code");
+        const binDir = NodePath.join(root, "bin[s3code]");
+        const shim = NodePath.join(binDir, "s3code.cmd");
+        await NodeFSP.mkdir(binDir, { recursive: true });
 
-      const desktopShim = '@echo off\r\n"C:\\Program Files\\T3 Code\\T3 Code.exe" "x" %*\r\n';
-      await NodeFSP.writeFile(shim, desktopShim);
-      const foreign = await installOver({ script: "install.ps1", home, binDir });
-      expect(foreign.code).not.toBe(0);
-      expect(foreign.output).toContain("another t3 is already at");
-      expect(await NodeFSP.readFile(shim, "utf8")).toBe(desktopShim);
+        const desktopShim = '@echo off\r\n"C:\\Program Files\\s3code\\s3code.exe" "x" %*\r\n';
+        await NodeFSP.writeFile(shim, desktopShim);
+        const foreign = await installOver({ script: "install.ps1", home, binDir });
+        expect(foreign.code).not.toBe(0);
+        expect(foreign.output).toContain("another s3code is already at");
+        expect(await NodeFSP.readFile(shim, "utf8")).toBe(desktopShim);
 
-      // A hand-edited wrapper may set its own environment; replacing it would drop that.
-      const edited = `@echo off\r\nset "T3CODE_HOME=D:\\other"\r\n"${NodePath.join(home, "runtime", "versions", "1.0.0", "t3.exe")}" %*`;
-      await NodeFSP.writeFile(shim, edited, "utf8");
-      const wrapper = await installOver({ script: "install.ps1", home, binDir });
-      expect(wrapper.code).not.toBe(0);
-      expect(await NodeFSP.readFile(shim, "utf8")).toBe(edited);
+        // A hand-edited wrapper may set its own environment; replacing it would drop that.
+        const edited = `@echo off\r\nset "T3CODE_HOME=D:\\other"\r\n"${NodePath.join(home, "runtime", "versions", "1.0.0", "s3code.exe")}" %*`;
+        await NodeFSP.writeFile(shim, edited, "utf8");
+        const wrapper = await installOver({ script: "install.ps1", home, binDir });
+        expect(wrapper.code).not.toBe(0);
+        expect(await NodeFSP.readFile(shim, "utf8")).toBe(edited);
 
-      const climbing = `@echo off\r\n"${NodePath.join(home, "runtime", "versions")}\\..\\other\\t3.exe" %*`;
-      await NodeFSP.writeFile(shim, climbing, "utf8");
-      const outside = await installOver({ script: "install.ps1", home, binDir });
-      expect(outside.code).not.toBe(0);
-      expect(await NodeFSP.readFile(shim, "utf8")).toBe(climbing);
+        const climbing = `@echo off\r\n"${NodePath.join(home, "runtime", "versions")}\\..\\other\\s3code.exe" %*`;
+        await NodeFSP.writeFile(shim, climbing, "utf8");
+        const outside = await installOver({ script: "install.ps1", home, binDir });
+        expect(outside.code).not.toBe(0);
+        expect(await NodeFSP.readFile(shim, "utf8")).toBe(climbing);
 
-      const older = NodePath.join(home, "runtime", "versions", "1.0.0", "t3.exe");
-      await NodeFSP.writeFile(shim, `@echo off\r\n"${older}" %*`, "utf8");
-      const upgrade = await installOver({ script: "install.ps1", home, binDir });
-      expect(upgrade.code, upgrade.output).toBe(0);
-      expect(await NodeFSP.readFile(shim, "utf8")).toContain(
-        NodePath.join(upgrade.target, "t3.exe"),
-      );
+        const older = NodePath.join(home, "runtime", "versions", "1.0.0", "s3code.exe");
+        await NodeFSP.writeFile(shim, `@echo off\r\n"${older}" %*`, "utf8");
+        const upgrade = await installOver({ script: "install.ps1", home, binDir });
+        expect(upgrade.code, upgrade.output).toBe(0);
+        expect(await NodeFSP.readFile(shim, "utf8")).toContain(
+          NodePath.join(upgrade.target, "s3code.exe"),
+        );
 
-      const again = await installOver({ script: "install.ps1", home, binDir });
-      expect(again.code, again.output).toBe(0);
+        const again = await installOver({ script: "install.ps1", home, binDir });
+        expect(again.code, again.output).toBe(0);
 
-      // Another t3 first on PATH still runs, so the installer names this one in full.
-      const otherBin = NodePath.join(root, "other");
-      await NodeFSP.mkdir(otherBin);
-      await NodeFSP.writeFile(NodePath.join(otherBin, "t3.cmd"), "@echo off\r\n");
-      // Windows spells it Path; a second PATH key would be ambiguous.
-      const pathKey =
-        Object.keys(process.env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
-      const shadowed = await installOver({
-        script: "install.ps1",
-        home,
-        binDir,
-        env: { [pathKey]: `${otherBin};${process.env[pathKey] ?? ""}` },
-      });
-      expect(shadowed.code, shadowed.output).toBe(0);
-      expect(shadowed.output).toContain(
-        `Another t3 at ${NodePath.join(otherBin, "t3.cmd")} runs first`,
-      );
+        // Another s3code first on PATH still runs, so the installer names this one in full.
+        const otherBin = NodePath.join(root, "other");
+        await NodeFSP.mkdir(otherBin);
+        await NodeFSP.writeFile(NodePath.join(otherBin, "s3code.cmd"), "@echo off\r\n");
+        // Windows spells it Path; a second PATH key would be ambiguous.
+        const pathKey =
+          Object.keys(process.env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
+        const shadowed = await installOver({
+          script: "install.ps1",
+          home,
+          binDir,
+          env: { [pathKey]: `${otherBin};${process.env[pathKey] ?? ""}` },
+        });
+        expect(shadowed.code, shadowed.output).toBe(0);
+        expect(shadowed.output).toContain(
+          `Another s3code at ${NodePath.join(otherBin, "s3code.cmd")} runs first`,
+        );
 
-      // Its own folder on PATH with a trailing separator is already on PATH.
-      const slashed = await installOver({
-        script: "install.ps1",
-        home,
-        binDir,
-        env: { [pathKey]: `${binDir}\\;${process.env[pathKey] ?? ""}` },
-      });
-      expect(slashed.code, slashed.output).toBe(0);
-      expect(slashed.output).toContain("to use T3 Code here");
-      // The same when the install folder itself is given with a trailing separator.
-      const bothSlashed = await installOver({
-        script: "install.ps1",
-        home,
-        binDir: `${binDir}\\`,
-        env: { [pathKey]: `${binDir}\\;${process.env[pathKey] ?? ""}` },
-      });
-      expect(bothSlashed.code, bothSlashed.output).toBe(0);
-      expect(bothSlashed.output).toContain("to use T3 Code here");
-    } finally {
-      await NodeFSP.rm(root, { recursive: true, force: true });
-    }
-  });
-});
+        // Its own folder on PATH with a trailing separator is already on PATH.
+        const slashed = await installOver({
+          script: "install.ps1",
+          home,
+          binDir,
+          env: { [pathKey]: `${binDir}\\;${process.env[pathKey] ?? ""}` },
+        });
+        expect(slashed.code, slashed.output).toBe(0);
+        expect(slashed.output).toContain("to use s3code here");
+        // The same when the install folder itself is given with a trailing separator.
+        const bothSlashed = await installOver({
+          script: "install.ps1",
+          home,
+          binDir: `${binDir}\\`,
+          env: { [pathKey]: `${binDir}\\;${process.env[pathKey] ?? ""}` },
+        });
+        expect(bothSlashed.code, bothSlashed.output).toBe(0);
+        expect(bothSlashed.output).toContain("to use s3code here");
+      } finally {
+        await NodeFSP.rm(root, { recursive: true, force: true });
+      }
+    });
+  },
+);
 
 describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer checksum", () => {
   it.each(
@@ -366,7 +378,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chec
         const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-install-checksum-"));
         const home = NodePath.join(root, homeName);
         const version = "1.2.3";
-        const stem = `t3-${version}-linux-${HostProcess.Architecture.defaultValue()}`;
+        const stem = `s3code-${version}-linux-${HostProcess.Architecture.defaultValue()}`;
         const archiveName = `${stem}.tar.gz`;
         const server = NodeHttp.createServer();
         try {
@@ -396,8 +408,8 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chec
           }
           await NodeFSP.mkdir(NodePath.join(root, stem));
           await NodeFSP.writeFile(
-            NodePath.join(root, stem, "t3"),
-            "#!/bin/sh\necho 't3 v1.2.3'\n",
+            NodePath.join(root, stem, "s3code"),
+            "#!/bin/sh\necho 's3code v1.2.3'\n",
             { mode: 0o755 },
           );
           const archivePath = NodePath.join(root, archiveName);
@@ -445,14 +457,14 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chec
               await NodeFSP.readFile(NodePath.join(versions, version, ".install-complete"), "utf8"),
             ).toBe("1.2.3\n");
             expect(
-              NodeChildProcess.execFileSync(NodePath.join(root, "bin/t3"), ["--version"], {
+              NodeChildProcess.execFileSync(NodePath.join(root, "bin/s3code"), ["--version"], {
                 encoding: "utf8",
               }).trim(),
-            ).toBe("t3 v1.2.3");
+            ).toBe("s3code v1.2.3");
           } else {
             expect(code).not.toBe(0);
             expect(output).toContain("checksum mismatch");
-            expect(output).not.toContain("Installed T3 Code");
+            expect(output).not.toContain("Installed s3code");
             expect(await NodeFSP.readdir(versions)).toEqual([]);
           }
         } finally {

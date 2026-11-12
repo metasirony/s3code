@@ -1,4 +1,26 @@
-# T3 Code
+# s3code
+
+s3code is the metasirony fork of [T3 Code](https://github.com/pingdotgg/t3code).
+The installed official T3 Code Nightly is a separate application.
+
+Build from this repository with `vp i`, then `vp run dev` for the local web client
+or `vp run dist:desktop:win` for a Windows installer. Fork binaries and releases
+belong at https://github.com/metasirony/s3code/releases; no fork release is published yet.
+The upstream installation commands below install the official product.
+
+The fork uses app ID `io.github.metasirony.s3code`, executable/command `s3code`,
+server home `~/.s3code`, Electron profiles `s3code` and `s3code-dev`, and URL schemes
+`s3code:` and `s3code-dev:`. `T3CODE_*` overrides, internal workspace packages and
+wire/MCP contracts remain compatible. Explicit data-directory overrides still work;
+do not point a fork build at the official app’s live home. No automatic data import
+is performed. Product telemetry is disabled by default. Desktop and CLI updates use this fork’s GitHub releases; the optional
+npm launcher is named `@metasirony/s3code` and requires separate publisher setup.
+Official release/deployment workflows remain gated to upstream; they are not a fork release service.
+
+Web and desktop keep the existing icon asset/export pipeline until a separate S3
+logo change. Mobile remains the upstream native product, without new store IDs or accounts.
+
+## Upstream project
 
 T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
 

@@ -64,8 +64,8 @@ const makeContent = Effect.fn("test.makeContent")(function* () {
   const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-notary-" });
   const contentDir = path.join(root, "content");
   yield* fs.makeDirectory(contentDir);
-  const executablePath = path.join(contentDir, "t3");
-  yield* fs.writeFileString(executablePath, "t3");
+  const executablePath = path.join(contentDir, "s3code");
+  yield* fs.writeFileString(executablePath, "s3code");
   return { root, contentDir, executablePath, submissionFile: path.join(root, "submission") };
 });
 
@@ -78,7 +78,7 @@ it.layer(NodeServices.layer)("build-cli-archive notarization", (it) => {
       const fs = yield* FileSystem.FileSystem;
       // Apple documents id and path for an unwaited submit; a pending status must not fail it.
       for (const submitted of [
-        '{"id":"new-id","message":"Successfully uploaded file","path":"t3.zip"}',
+        '{"id":"new-id","message":"Successfully uploaded file","path":"s3code.zip"}',
         '{"id":"new-id","status":"In Progress"}',
       ]) {
         const content = yield* makeContent();
