@@ -1,5 +1,21 @@
 # Brand icons
 
+## s3code Windows and web
+
+The approved S3 artwork is preserved in `s3code/s3-logo-blue.svg` and
+`s3code/s3-logo-black.svg`. The first Windows build uses the blue version for
+all channels. Run `vp run icons:export:s3` to rasterize that SVG with `sharp`
+and the shared PNG/ICO encoder, or `vp run icons:check:s3` to verify the outputs.
+This updates Windows EXE/installer icons, web icons and their public copies,
+the root favicon, and universal PNGs without changing the SVG geometry.
+Existing asset filenames are retained for the build consumers.
+
+The Icon Composer pipeline below remains for upstream Apple artwork. It can
+overwrite these Windows/web outputs; rerun the S3 export afterwards. Apple and
+native mobile artwork are outside this first Windows export.
+
+## Upstream Icon Composer projects
+
 The three Icon Composer projects are the source of truth for full application icons:
 
 - `dev/app-icon.icon`
