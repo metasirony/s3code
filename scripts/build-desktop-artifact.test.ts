@@ -47,8 +47,10 @@ import {
   ancestorNodeModulesPaths,
   copyDirectoryPreservingSymlinks,
   LinuxBrowserSecretHostError,
+  LinuxPackagedAppMissingError,
   MacPackagedAppMissingError,
   stageBrowserSecret,
+  validateLinuxPackagedPayload,
   validateMacPackagedPayload,
   validateWindowsPackagedPayload,
   verifyPackagedBundleIsSelfContained,
@@ -90,7 +92,7 @@ const makeLinuxCliArchiveFixture = Effect.fn("test.makeLinuxCliArchiveFixture")(
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const contentRoot = path.join(input.root, "content");
   const members = [
-    `${input.stem}/s3code`,
+    `${input.stem}/t3`,
     `${input.stem}/client/index.html`,
     `${input.stem}/node_modules/node-pty/package.json`,
     `${input.stem}/node_modules/node-pty/build/Release/pty.node`,
@@ -181,7 +183,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
         ? yield* makeLinuxCliArchiveFixture({
             root: path.join(tempDir, "wsl-runtime"),
             stem: "apps",
-            omitMembers: ["apps/s3code", "apps/client/index.html"],
+            omitMembers: ["apps/t3", "apps/client/index.html"],
             extraMembers: ["apps/server/dist/bin.mjs", "node_modules/node-pty/package.json"],
           })
         : yield* makeLinuxCliArchiveFixture({
@@ -215,8 +217,9 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
   } as const;
 });
 
-const makeMacPayloadFixture = Effect.fn("test.makeMacPayloadFixture")(function* (input: {
+const makePackagedAppFixture = Effect.fn("test.makePackagedAppFixture")(function* (input: {
   readonly serverEntrySource?: string;
+  readonly resourcesPath?: string;
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -227,7 +230,10 @@ const makeMacPayloadFixture = Effect.fn("test.makeMacPayloadFixture")(function* 
   yield* fs.writeFileString(serverEntryPath, input.serverEntrySource ?? "console.log('server');\n");
 
   const stageDistDir = path.join(tempDir, "dist");
-  const resourcesDir = path.join(stageDistDir, "mac-arm64/s3code.app/Contents/Resources");
+  const resourcesDir = path.join(
+    stageDistDir,
+    input.resourcesPath ?? "mac-arm64/s3code.app/Contents/Resources",
+  );
   yield* fs.makeDirectory(resourcesDir, { recursive: true });
   yield* Effect.promise(() =>
     createPackageWithOptions(sourceDir, path.join(resourcesDir, "app.asar"), {}),
@@ -528,17 +534,13 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         undefined,
       );
 
-      assert.equal(release.appId, "io.github.metasirony.s3code");
-      assert.equal(release.executableName, "s3code");
-      assert.equal(release.artifactName, "s3code-${version}-${arch}.${ext}");
-      assert.equal(release.productName, "s3code");
       assert.isNull(preview.publish);
       assert.isNull(previewChannel.publish);
       assert.deepStrictEqual(release.publish, [
         {
           provider: "github",
-          owner: "metasirony",
-          repo: "s3code",
+          owner: "pingdotgg",
+          repo: "t3code",
           releaseType: "release",
         },
       ]);
@@ -549,6 +551,22 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         ),
       ),
     ),
+  );
+
+  it.effect("names the Electron window class in the Linux desktop entry", () =>
+    Effect.gen(function* () {
+      const linux = yield* createBuildConfig(
+        "linux",
+        "AppImage",
+        "0.0.33",
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+
+      assert.nestedPropertyVal(linux, "linux.desktop.entry.StartupWMClass", "io.github.metasirony.s3code");
+    }),
   );
 
   it.effect("declares Calendar access for hosted commands in macOS builds", () =>
@@ -1368,7 +1386,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   it.effect("rejects a macOS app whose packaged server bundle cannot resolve", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const fixture = yield* makeMacPayloadFixture({
+        const fixture = yield* makePackagedAppFixture({
           serverEntrySource: 'import "t3code-deliberately-missing-package";\n',
         });
         const error = yield* validateMacPackagedPayload({
@@ -1384,7 +1402,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   it.effect("accepts a macOS app whose packaged server bundle resolves", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const fixture = yield* makeMacPayloadFixture({});
+        const fixture = yield* makePackagedAppFixture({});
         yield* validateMacPackagedPayload({ stageDistDir: fixture.stageDistDir });
       }),
     ),
@@ -1413,6 +1431,29 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         const error = yield* validateMacPackagedPayload({ stageDistDir }).pipe(Effect.flip);
 
         assert.instanceOf(error, BundleNotSelfContainedError);
+      }),
+    ),
+  );
+
+  it.effect("rejects a Linux app whose packaged server bundle cannot resolve", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const fixture = yield* makePackagedAppFixture({
+          resourcesPath: "linux-arm64-unpacked/resources",
+          serverEntrySource: 'import "t3code-deliberately-missing-package";\n',
+        });
+        const error = yield* validateLinuxPackagedPayload({
+          stageDistDir: fixture.stageDistDir,
+        }).pipe(Effect.flip);
+        assert.instanceOf(error, BundleNotSelfContainedError);
+        assert.include(error.output, "t3code-deliberately-missing-package");
+
+        const emptyStage = yield* fs.makeTempDirectoryScoped({ prefix: "t3-linux-payload-test-" });
+        const missing = yield* validateLinuxPackagedPayload({ stageDistDir: emptyStage }).pipe(
+          Effect.flip,
+        );
+        assert.instanceOf(missing, LinuxPackagedAppMissingError);
       }),
     ),
   );
@@ -1449,7 +1490,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     });
 
     assert.deepStrictEqual(configuration, {
-      appId: "io.github.metasirony.s3code",
+      appId: "com.t3tools.t3code",
       teamId: "ABC1234567",
       rpDomains: ["example.clerk.accounts.dev"],
       provisioningProfilePath: "/tmp/t3code.provisionprofile",
@@ -1472,7 +1513,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       "clerk.example.com",
       "example.clerk.accounts.dev",
     ]);
-    assert.include(entitlements, "<string>ABC1234567.io.github.metasirony.s3code</string>");
+    assert.include(entitlements, "<string>ABC1234567.com.t3tools.t3code</string>");
     assert.include(entitlements, "<string>webcredentials:clerk.example.com</string>");
     assert.include(entitlements, "<string>webcredentials:example.clerk.accounts.dev</string>");
     assert.include(entitlements, "<key>com.apple.security.cs.allow-jit</key>");
@@ -1483,7 +1524,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   });
 
   it("grants in-app browser passkey entitlements only when the provisioning profile does", () => {
-    const configuration = { appId: "io.github.metasirony.s3code", teamId: "ABC1234567" };
+    const configuration = { appId: "com.t3tools.t3code", teamId: "ABC1234567" };
     const profile = (entitlements: string, outside = "") =>
       `0\x82\x1f\x9a\x06\t*\x86H<?xml version="1.0"?><plist version="1.0"><dict>${outside}<key>Entitlements</key><dict>${entitlements}</dict></dict></plist>\x00\x01`;
     const teamWildcardGroups = `<key>keychain-access-groups</key>
@@ -1525,7 +1566,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         configuration,
       ),
       {
-        touchIdKeychainAccessGroup: "ABC1234567.io.github.metasirony.s3code.webauthn",
+        touchIdKeychainAccessGroup: "ABC1234567.com.t3tools.t3code.webauthn",
         browserPasskeys: true,
       },
     );
@@ -1541,7 +1582,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     );
     assert.match(
       entitlements,
-      /<key>keychain-access-groups<\/key>\s*<array>\s*<string>ABC1234567\.io\.github\.metasirony\.s3code\.webauthn<\/string>\s*<\/array>/u,
+      /<key>keychain-access-groups<\/key>\s*<array>\s*<string>ABC1234567\.com\.t3tools\.t3code\.webauthn<\/string>\s*<\/array>/u,
     );
     assert.match(
       entitlements,

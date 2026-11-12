@@ -1,25 +1,25 @@
 #!/bin/sh
-# Installs the s3code CLI from a GitHub Release archive. Needs only sh, tar,
+# Installs the T3 Code CLI from a GitHub Release archive. Needs only sh, tar,
 # sha256sum or shasum, and curl or wget; no Node, npm, or compiler.
 #
-#   curl -fsSL https://raw.githubusercontent.com/metasirony/s3code/main/scripts/install.sh | sh
+#   curl -fsSL https://t3.codes/install.sh | sh
 #
 # Environment:
 #   T3CODE_CHANNEL           release train to follow: stable, nightly, or preview
 #                            (default: stable; preview is a maintainers' test train)
 #   T3CODE_VERSION           exact version to install (overrides T3CODE_CHANNEL)
-#   T3CODE_HOME              T3 home directory (default: ~/.s3code)
-#   T3CODE_INSTALL_BIN_DIR   where the `s3code` symlink goes (default: ~/.local/bin)
+#   T3CODE_HOME              T3 home directory (default: ~/.t3)
+#   T3CODE_INSTALL_BIN_DIR   where the `t3` symlink goes (default: ~/.local/bin)
 #   T3CODE_RELEASE_BASE_URL  mirror for releases/download (default: GitHub)
 #
 # The archive is unpacked into $T3CODE_HOME/runtime/versions/<version>, the
-# same layout `s3code service install` uses, so the service reuses this download
+# same layout `t3 service install` uses, so the service reuses this download
 # instead of fetching the release again.
 set -eu
 
-repo="metasirony/s3code"
+repo="pingdotgg/t3code"
 base_url="${T3CODE_RELEASE_BASE_URL:-https://github.com/${repo}/releases/download}"
-t3_home="${T3CODE_HOME:-$HOME/.s3code}"
+t3_home="${T3CODE_HOME:-$HOME/.t3}"
 case "$t3_home" in
   /*) ;;
   *)
@@ -29,7 +29,7 @@ case "$t3_home" in
     ;;
 esac
 bin_dir="${T3CODE_INSTALL_BIN_DIR:-$HOME/.local/bin}"
-# Trailing slashes would put `//` in the paths the s3code command guard compares.
+# Trailing slashes would put `//` in the paths the t3 command guard compares.
 while [ "${t3_home%/}" != "$t3_home" ] && [ "$t3_home" != / ]; do t3_home="${t3_home%/}"; done
 while [ "${bin_dir%/}" != "$bin_dir" ] && [ "$bin_dir" != / ]; do bin_dir="${bin_dir%/}"; done
 # Absolute, so the PATH hint never adds a folder that changes with the working directory.
@@ -54,19 +54,33 @@ step() {
 }
 if "$interactive"; then
   printf '\n%s' "$bold" >&2
-  printf '  %s\n' 'в–€в–€в–€в–€в–€в–€в–€в–€в–€в–€ в–€в–€в–€в–€в–€в–€в–€в–€ ' >&2
-  printf '  %s\n' '    в–€в–€в–€       в–„в–€в–€в–Ђ       s3code' >&2
-  printf '  %s%s     %sCLI installer%s\n' '    в–€в–€в–€       в–€в–€в–€в–€в–„ ' "$reset" "$muted" "$reset$bold" >&2
-  printf '  %s\n' '    в–€в–€в–€    в–„     в–€в–€в–€' >&2
-  printf '  %s\n' '    в–€в–€в–€    в–€в–€в–€в–€в–€в–€в–€в–Ђ ' >&2
+  printf '  %s\n' '██████████ ████████ ' >&2
+  printf '  %s\n' '    ███       ▄██▀       T3 Code' >&2
+  printf '  %s%s     %sCLI installer%s\n' '    ███       ████▄ ' "$reset" "$muted" "$reset$bold" >&2
+  printf '  %s\n' '    ███    ▄     ███' >&2
+  printf '  %s\n' '    ███    ███████▀ ' >&2
   printf '%s\n' "$reset" >&2
 fi
 step "Finding your release..."
 
+# Sleeps 1, 2, then 4 s before retrying a 408, 429, 5xx, or network error. Not curl
+# --retry: older curl waits out any Retry-After, however long.
+backoff() {
+  case "$1" in 408 | 429) ;; 4??) return 1 ;; esac
+  [ "$2" -lt 4 ] && sleep "$((1 << ($2 - 1)))"
+}
+
 # Exit 44 on a 404 so callers can tell "no such asset" from a network failure.
 fetch() {
   if command -v curl >/dev/null 2>&1; then
-    status="$(curl -sSL -H "Accept: ${3:-*/*}" -w '%{http_code}' "$1" -o "$2")" || return 1
+    attempt=1
+    while :; do
+      code=0; status="$(curl -sSL -H "Accept: ${3:-*/*}" -w '%{http_code}' "$1" -o "$2")" || code=$?
+      case "$code:$status" in 0:2??) break ;; esac
+      backoff "$status" "$attempt" || break
+      attempt=$((attempt + 1))
+    done
+    [ "$code" -eq 0 ] || return 1
     case "$status" in
       2??) return 0 ;;
       404) return 44 ;;
@@ -85,18 +99,30 @@ mb() {
   tenths=$((($1 * 10 + 524288) / 1048576))
   printf '%s.%s' "$((tenths / 10))" "$((tenths % 10))"
 }
-# Poll the file written by the downloader; no progress-output parsing or extra request.
-download() {
-  if ! "$interactive"; then fetch "$1" "$2"; return; fi
+download_start() {
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL -D "$2.headers" "$1" -o "$2" 2>"$2.errors" &
+    curl -fsSL -w '%{http_code}' -D "$2.headers" "$1" -o "$2" >"$2.status" 2>"$2.errors" &
   else
     wget -q --server-response "$1" -O "$2" 2>"$2.headers" &
   fi
   download_pid=$!
+}
+# Reaps the finished download, then restarts it if curl hit a transient error.
+download_retry() {
+  result=0; wait "$download_pid" || result=$?
+  download_pid=
+  [ "$result" -ne 0 ] && [ -f "$2.status" ] && backoff "$(cat "$2.status")" "$attempt" || return 1
+  attempt=$((attempt + 1))
+  download_start "$1" "$2"
+}
+# Poll the file written by the downloader; no progress-output parsing or extra request.
+download() {
+  if ! "$interactive"; then fetch "$1" "$2"; return; fi
+  attempt=1
+  download_start "$1" "$2"
   previous=-1
   cr="$(printf '\r')"
-  while kill -0 "$download_pid" 2>/dev/null; do
+  while kill -0 "$download_pid" 2>/dev/null || download_retry "$1" "$2"; do
     bytes=0; total=0
     if [ -f "$2" ]; then bytes="$(wc -c < "$2")"; fi
     if [ -f "$2.headers" ]; then
@@ -113,7 +139,7 @@ download() {
         percent=$((bytes * 100 / total)); [ "$percent" -le 100 ] || percent=100
         filled=$((percent * 32 / 100)); bar=; rest=; n=0
         while [ "$n" -lt 32 ]; do
-          if [ "$n" -lt "$filled" ]; then bar="${bar}в– "; else rest="${rest}В·"; fi
+          if [ "$n" -lt "$filled" ]; then bar="${bar}■"; else rest="${rest}·"; fi
           n=$((n + 1))
         done
         printf '\r\033[2K  %s%s%s%s%s %3d%%  %s%s / %s MB%s' "$accent" "$bar" "$reset$muted" "$rest" "$reset" "$percent" "$muted" "$(mb "$bytes")" "$(mb "$total")" "$reset" >&2
@@ -124,16 +150,14 @@ download() {
     fi
     sleep 0.1
   done
-  result=0; wait "$download_pid" || result=$?
-  download_pid=
   if [ "$result" -ne 0 ]; then
     printf '\n' >&2
     if [ -f "$2.errors" ]; then cat "$2.errors" >&2; else cat "$2.headers" >&2; fi
     return "$result"
   fi
   size="$(mb "$(wc -c < "$2")")"
-  printf '\r\033[2K  %sв– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– в– %s 100%%  %s%s / %s MB%s\n' "$accent" "$reset" "$muted" "$size" "$size" "$reset" >&2
-  rm -f "$2.headers" "$2.errors"
+  printf '\r\033[2K  %s■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■%s 100%%  %s%s / %s MB%s\n' "$accent" "$reset" "$muted" "$size" "$size" "$reset" >&2
+  rm -f "$2.headers" "$2.errors" "$2.status"
 }
 
 case "$(uname -s)" in
@@ -147,7 +171,7 @@ case "$(uname -m)" in
   *) fail "unsupported architecture $(uname -m)" ;;
 esac
 if [ "${platform}-${arch}" = darwin-x64 ]; then
-  fail "there is no s3code CLI for Intel Macs. Install the desktop app from https://github.com/metasirony/s3code/releases, or run a server from source: https://github.com/${repo}/blob/main/docs/user/install.md#intel-macs"
+  fail "there is no t3 CLI for Intel Macs. Install the desktop app from https://t3.codes/download, or run a server from source: https://github.com/${repo}/blob/main/docs/user/install.md#intel-macs"
 fi
 command -v tar >/dev/null 2>&1 || fail "tar is required"
 if command -v sha256sum >/dev/null 2>&1; then
@@ -187,7 +211,7 @@ fi
 case "$version" in
   *-preview.*)
     printf '%s\n' \
-      "s3code ${version} is a preview build." \
+      "t3 ${version} is a preview build." \
       "  Preview builds are cut by maintainers from unreleased branches to exercise the release" \
       "  pipeline. They can be broken, receive no fixes, and are never offered as updates." \
       "  Set T3CODE_CHANNEL=stable (the default) for a supported build." >&2
@@ -197,7 +221,7 @@ case "$version" in
     ;;
 esac
 
-stem="s3code-${version}-${platform}-${arch}"
+stem="t3-${version}-${platform}-${arch}"
 archive="${stem}.tar.gz"
 versions_dir="${t3_home}/runtime/versions"
 target_dir="${versions_dir}/${version}"
@@ -213,27 +237,27 @@ else
   trap 'printf "\n" >&2; exit 143' TERM
 
   if "$interactive"; then printf '\r\033[2K' >&2; fi
-  printf '  %sInstalling%s s3code %s%s%s\n\n' "$muted" "$reset" "$bold" "$version" "$reset" >&2
+  printf '  %sInstalling%s T3 Code %s%s%s\n\n' "$muted" "$reset" "$bold" "$version" "$reset" >&2
   step "Downloading..."
   fetch_status=0
   fetch "${base_url}/v${version}/SHA256SUMS" "${staging}/SHA256SUMS" || fetch_status=$?
   if [ "$fetch_status" -eq 44 ]; then
-    fail "s3code ${version} has no release archive for ${platform}-${arch}; releases before the self-contained CLI can only be installed with \`npm install -g @metasirony/s3code@${version}\`"
+    fail "t3 ${version} has no release archive for ${platform}-${arch}; releases before the self-contained CLI can only be installed with \`npm install -g t3@${version}\`"
   elif [ "$fetch_status" -ne 0 ]; then
     fail "could not download the release checksums"
   fi
   expected="$(grep " \*\{0,1\}${archive}\$" "${staging}/SHA256SUMS" | cut -d' ' -f1)"
-  [ -n "$expected" ] || fail "s3code ${version} has no release archive for ${platform}-${arch}"
+  [ -n "$expected" ] || fail "t3 ${version} has no release archive for ${platform}-${arch}"
   download "${base_url}/v${version}/${archive}" "${staging}/${archive}"
 
   step "Verifying the download..."
   actual="$(checksum "${staging}/${archive}")"
   [ "$actual" = "$expected" ] || fail "checksum mismatch for ${archive}"
 
-  step "Extracting s3code..."
+  step "Extracting T3 Code..."
   tar -xzf "${staging}/${archive}" -C "$staging" --strip-components=1
   rm -f "${staging}/${archive}" "${staging}/SHA256SUMS"
-  "${staging}/s3code" --version >/dev/null || fail "the downloaded executable does not run"
+  "${staging}/t3" --version >/dev/null || fail "the downloaded executable does not run"
   printf '%s\n' "$version" > "${staging}/.install-complete"
 
   rm -rf "$target_dir"
@@ -241,21 +265,21 @@ else
   trap - EXIT
 fi
 
-step "Setting up the s3code command..."
+step "Setting up the t3 command..."
 mkdir -p "$bin_dir"
-# Replace only this home's own s3code links: into its versions, or the desktop app's launcher.
+# Replace only this home's own t3 links: into its versions, or the desktop app's launcher.
 # Anything that is not a symlink (a script, a copied binary) belongs to someone else.
-# Exactly <versions>/<version>/s3code ($1 under $2), never another program inside a version.
+# Exactly <versions>/<version>/t3 ($1 under $2), never another program inside a version.
 version_t3() {
   case "$1" in "$2"/*) ;; *) return 1 ;; esac
-  case "${1#"$2"/}" in */*/*) return 1 ;; */s3code) return 0 ;; *) return 1 ;; esac
+  case "${1#"$2"/}" in */*/*) return 1 ;; */t3) return 0 ;; *) return 1 ;; esac
 }
 slot_empty=true
-if [ -e "${bin_dir}/s3code" ] || [ -L "${bin_dir}/s3code" ]; then
+if [ -e "${bin_dir}/t3" ] || [ -L "${bin_dir}/t3" ]; then
   slot_empty=false
   owned=false
-  if [ -L "${bin_dir}/s3code" ]; then
-    existing="$(readlink "${bin_dir}/s3code" 2>/dev/null || true)"
+  if [ -L "${bin_dir}/t3" ]; then
+    existing="$(readlink "${bin_dir}/t3" 2>/dev/null || true)"
     case "$existing" in /*) ;; *) existing="${bin_dir}/${existing}" ;; esac
     real_versions_dir="$(CDPATH='' cd -P -- "$versions_dir" && pwd)"
     # Through a symlinked T3 home the link text names the alias; resolve its folder to compare.
@@ -265,28 +289,28 @@ if [ -e "${bin_dir}/s3code" ] || [ -L "${bin_dir}/s3code" ]; then
       */./* | */../* | */. | */..) ;;
       *)
         if version_t3 "$existing" "$versions_dir" || version_t3 "$existing" "$real_versions_dir" ||
-          [ "$existing" = "${t3_home}/bin/s3code" ]; then owned=true; fi
+          [ "$existing" = "${t3_home}/bin/t3" ]; then owned=true; fi
         ;;
     esac
     if [ -n "$existing_dir" ] && version_t3 "${existing_dir}/${existing##*/}" "$real_versions_dir"; then
       owned=true
     fi
   fi
-  "$owned" || fail "another s3code is already at ${bin_dir}/s3code. Remove it and run this again, or run ${target_dir}/s3code directly."
+  "$owned" || fail "another t3 is already at ${bin_dir}/t3. Remove it and run this again, or run ${target_dir}/t3 directly."
 fi
 # An empty spot is linked without -f, so a file that appears after the check above is kept.
 if "$slot_empty"; then
-  ln -s "${target_dir}/s3code" "${bin_dir}/s3code" || fail "could not link ${bin_dir}/s3code; something else was created there."
+  ln -s "${target_dir}/t3" "${bin_dir}/t3" || fail "could not link ${bin_dir}/t3; something else was created there."
 else
   # Known race, accepted: a file written here after the ownership check above is overwritten.
-  ln -sfn "${target_dir}/s3code" "${bin_dir}/s3code"
+  ln -sfn "${target_dir}/t3" "${bin_dir}/t3"
 fi
 # Pruning keeps what this launcher points at; a background service cannot see bin_dir otherwise.
-launcher="$(CDPATH='' cd -P -- "$bin_dir" && pwd)/s3code"
+launcher="$(CDPATH='' cd -P -- "$bin_dir" && pwd)/t3"
 launchers="${t3_home}/runtime/launchers"
 grep -qxF "$launcher" "$launchers" 2>/dev/null || printf '%s\n' "$launcher" >> "$launchers"
 if "$interactive"; then printf '\r\033[2K' >&2; fi
-printf '  %sInstalled s3code %s%s\n\n' "$green" "$version" "$reset" >&2
+printf '  %sInstalled T3 Code %s%s\n\n' "$green" "$version" "$reset" >&2
 # The folder a shell reads its startup file from: $1 when set and safe to paste, else $2 when
 # unset. A set but unsafe folder prints nothing, since the default would never be read.
 read_from() {
@@ -295,7 +319,7 @@ read_from() {
     /*) case "$1" in *[!A-Za-z0-9_./-]*) ;; *) printf '%s' "$1" ;; esac ;;
   esac
 }
-# A command to paste for zsh, Linux bash, or fish, like `s3code install` prints. macOS bash reads only
+# A command to paste for zsh, Linux bash, or fish, like `t3 install` prints. macOS bash reads only
 # one of several startup files, so no single file is safe to change there.
 path_command=
 path_rest="$bin_dir"
@@ -303,7 +327,7 @@ path_prefix=
 case "$bin_dir" in "$HOME"/*) path_rest="${bin_dir#"$HOME"}" path_prefix='$HOME' ;; esac
 case "$path_rest" in *[!A-Za-z0-9_./-]*) path_rest= ;; esac
 if [ -n "$path_rest" ]; then
-  # Last on PATH, so it never shadows another s3code.
+  # Last on PATH, so it never shadows another t3.
   path_line="export PATH=\"\$PATH:${path_prefix}${path_rest}\""
   shell_name="${SHELL:-}"
   case "${shell_name##*/}" in
@@ -319,20 +343,20 @@ if [ -n "$path_rest" ]; then
       [ -z "$config_dir" ] || path_command="mkdir -p ${fish_dir} && printf '\\n%s\\n' 'fish_add_path --append --path ${path_prefix}${path_rest}' >> ${fish_dir}/config.fish" ;;
   esac
 fi
-# A s3code earlier on PATH runs instead; the PATH command adds this folder last.
-# A PATH entry with a trailing slash gives `dir//s3code`.
-first_t3="$(command -v s3code 2>/dev/null | tr -s / || true)"
-case "$first_t3" in "" | "${bin_dir}/s3code") first_t3= ;; esac
+# A t3 earlier on PATH runs instead; the PATH command adds this folder last.
+# A PATH entry with a trailing slash gives `dir//t3`.
+first_t3="$(command -v t3 2>/dev/null | tr -s / || true)"
+case "$first_t3" in "" | "${bin_dir}/t3") first_t3= ;; esac
 if [ -n "$first_t3" ]; then
-  printf '  Another s3code at %s runs first, so run %s%s/s3code%s to use this one.\n\n' "$first_t3" "$bold" "$bin_dir" "$reset"
+  printf '  Another t3 at %s runs first, so run %s%s/t3%s to use this one.\n\n' "$first_t3" "$bold" "$bin_dir" "$reset"
 else
   case ":${PATH}:" in
-    *":${bin_dir}:"* | *":${bin_dir}/:"*) printf '  Run %ss3code%s to use s3code here, or %ss3code up%s to use it from your other devices.\n\n' "$bold" "$reset" "$bold" "$reset" ;;
+    *":${bin_dir}:"* | *":${bin_dir}/:"*) printf '  Run %st3%s to use T3 Code here, or %st3 up%s to use it from your other devices.\n\n' "$bold" "$reset" "$bold" "$reset" ;;
     *)
       if [ -n "$path_command" ]; then
-        printf '  %s is not on your PATH yet. Add it with:\n\n    %s\n\n  Then open a new terminal and run %ss3code%s.\n\n' "$bin_dir" "$path_command" "$bold" "$reset"
+        printf '  %s is not on your PATH yet. Add it with:\n\n    %s\n\n  Then open a new terminal and run %st3%s.\n\n' "$bin_dir" "$path_command" "$bold" "$reset"
       else
-        printf '  Add %s to your PATH, then run %ss3code%s.\n\n' "$bin_dir" "$bold" "$reset"
+        printf '  Add %s to your PATH, then run %st3%s.\n\n' "$bin_dir" "$bold" "$reset"
       fi
       ;;
   esac

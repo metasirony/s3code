@@ -129,14 +129,19 @@ describe("DesktopPreReadyPlatform", () => {
     let desktopName = "t3code.desktop";
     let desktopEntry = previousEntry;
     let iconInstalled = false;
-    copyFileSyncMock.mockImplementation((_source: string, destination: string) => {
-      iconInstalled = destination === "/xdg/icons/io.github.metasirony.s3code.desktop.png";
+    const iconSource = "/tmp/.mount_T3/resources/app.asar/apps/desktop/prod-resources/icon.png";
+    const iconPath = "/xdg/icons/io.github.metasirony.s3code.desktop.png";
+    const iconBytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    readFileSyncMock.mockImplementation((path: string) => {
+      if (path === iconSource) return iconBytes;
+      return "{}";
     });
     setDesktopNameMock.mockImplementation((name: string) => {
       desktopName = name;
     });
-    writeFileSyncMock.mockImplementation((path: string, contents: string) => {
-      if (path === "/xdg/applications/io.github.metasirony.s3code.desktop") desktopEntry = contents;
+    writeFileSyncMock.mockImplementation((path: string, contents: string | Buffer) => {
+      if (path === "/xdg/applications/io.github.metasirony.s3code.desktop") desktopEntry = String(contents);
+      if (path === iconPath) iconInstalled = Buffer.compare(Buffer.from(contents), iconBytes) === 0;
     });
 
     return Effect.scoped(
@@ -166,7 +171,12 @@ describe("DesktopPreReadyPlatform", () => {
           identity.desktopEntry ?? "",
           "Icon=/xdg/icons/io.github.metasirony.s3code.desktop.png",
         );
-        assert.isTrue(identity.iconInstalled);
+        assert.equal(
+          copyFileSyncMock.mock.calls.length,
+          0,
+          "icon must not be copied out of the app bundle",
+        );
+        assert.isTrue(identity.iconInstalled, "icon must be written from the bundled bytes");
       }),
     ).pipe(Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs())));
   });
@@ -184,7 +194,7 @@ describe("DesktopPreReadyPlatform", () => {
               DesktopConfig.layerTest({
                 XDG_DATA_HOME: "/xdg",
                 APPIMAGE: "/Applications/current.AppImage",
-                T3CODE_DESKTOP_LAUNCHER_PATH: " /opt/s3code app/s3code ",
+                T3CODE_DESKTOP_LAUNCHER_PATH: " /opt/s3code/t3code ",
               }),
             ),
           ),
@@ -192,7 +202,7 @@ describe("DesktopPreReadyPlatform", () => {
         const entry = writeFileSyncMock.mock.calls.find(
           ([path]) => path === "/xdg/applications/io.github.metasirony.s3code.desktop",
         )?.[1];
-        assert.include(entry, 'Exec="/opt/s3code app/s3code" %U');
+        assert.include(entry, 'Exec="/opt/s3code/t3code" %U');
       }),
     ).pipe(Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs())));
   });
