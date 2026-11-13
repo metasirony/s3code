@@ -78,7 +78,10 @@ function tokenize(command: string, windows: boolean): string[] | null {
   return tokens;
 }
 
-function readPaths(command: string, windows: boolean): string[] | null {
+function readPaths(
+  command: string,
+  windows: boolean,
+): { paths: string[]; canMaskReadFailure: boolean } | null {
   const tokens = tokenize(command, windows);
   if (!tokens?.length) return null;
   const executable = tokens[0]!
@@ -158,7 +161,12 @@ function readPaths(command: string, windows: boolean): string[] | null {
       piped = token === "|";
     } else group.push(token);
   }
-  return paths;
+  return {
+    paths,
+    canMaskReadFailure: tokens.some(
+      (token, index) => token === "|" || (token === ";" && index < tokens.length - 1),
+    ),
+  };
 }
 
 export function observedCodexSkillReads(
@@ -167,28 +175,29 @@ export function observedCodexSkillReads(
   home: string,
 ): ReadonlyArray<SkillIdentity> {
   if (item.status !== "completed" || item.exitCode !== 0) return [];
-  // PowerShell may exit zero after a non-terminating Get-Content error.
-  if (
-    /^(?:Get-Content|gc|cat|type|head|tail|sed|nl|more|less)\s*:/im.test(
-      NodeUtil.stripVTControlCharacters(item.aggregatedOutput ?? ""),
-    )
-  )
-    return [];
   const windows = /^(?:[a-z]:[\\/]|\\\\)/i.test(item.cwd);
   const parsed = readPaths(item.command, windows);
   // Codex collapses duplicate commandActions and can classify PowerShell reads as unknown.
   // Parse supported shell forms first to retain every read; trust read actions only for simple readers.
   const paths =
-    parsed ??
+    parsed?.paths ??
     item.commandActions.flatMap((action) =>
       action.type === "read" &&
       action.command === item.command &&
       /^(?:cat|head|tail|more|less|nl)\s/.test(action.command) &&
-      !/[;&|<>`$(){}]/.test(action.command)
+      !/[;\r\n&|<>`$(){}]/.test(action.command)
         ? [action.path]
         : [],
     );
   if (paths.length === 0) return [];
+  // A later command or pipeline can hide a read error; otherwise exit zero also covers the read.
+  if (
+    parsed?.canMaskReadFailure &&
+    /^(?:Get-Content|gc|cat|type|head|tail|sed|nl|more|less)\s*:/im.test(
+      NodeUtil.stripVTControlCharacters(item.aggregatedOutput ?? ""),
+    )
+  )
+    return [];
   const known = new Map(skills.map((skill) => [skillPath(skill.path, item.cwd, home), skill]));
   return paths.flatMap((path) => {
     const skill = known.get(skillPath(path, item.cwd, home));
