@@ -69,6 +69,29 @@ describe("Codex skill observations", () => {
     ).toHaveLength(count);
   });
 
+  it.each([
+    ["cat .agents/skills/review/SKILL.md", false, 1],
+    ["cat .agents/skills/review/SKILL.md && cat .agents/skills/review/SKILL.md", false, 2],
+    ["bash -lc 'cat .agents/skills/review/SKILL.md'", false, 1],
+    ["Get-Content .agents/skills/review/SKILL.md", true, 1],
+    ['pwsh -Command "Get-Content .agents/skills/review/SKILL.md"', true, 1],
+    ["nl .agents/skills/review/SKILL.md", false, 1],
+  ])("trusts an unmasked successful reader's exit code: %s", (command, windows, count) => {
+    const skill = windows ? windowsSkill : unixSkill;
+    expect(
+      observedCodexSkillReads(
+        {
+          ...commandItem(command, windows),
+          aggregatedOutput:
+            "# Instructions\ncat: missing: No such file or directory\nGet-Content: Cannot find path",
+          commandActions: [{ type: "read", command, name: "SKILL.md", path: skill.path }],
+        },
+        [skill],
+        windows ? "C:/Users/me" : "/home/me",
+      ),
+    ).toHaveLength(count);
+  });
+
   it("requires a successful read and retains repeated reads even when commandActions collapse them", () => {
     const command = "cat .agents/skills/review/SKILL.md";
     const item = commandItem(`${command} && ${command}`);
@@ -89,7 +112,10 @@ describe("Codex skill observations", () => {
     ).toHaveLength(2);
     expect(
       observedCodexSkillReads(
-        { ...item, aggregatedOutput: "cat: missing: No such file or directory" },
+        {
+          ...commandItem(`${command}; cat other.txt`),
+          aggregatedOutput: "cat: missing: No such file or directory",
+        },
         [unixSkill],
         "/home/me",
       ),
@@ -104,11 +130,35 @@ describe("Codex skill observations", () => {
     expect(
       observedCodexSkillReads(
         {
-          ...commandItem("Get-Content .agents/skills/review/SKILL.md", true),
+          ...commandItem("Get-Content .agents/skills/review/SKILL.md; Get-Content other.txt", true),
           aggregatedOutput: "Get-Content: Cannot find path",
         },
         [windowsSkill],
         "C:/Users/me",
+      ),
+    ).toEqual([]);
+    expect(
+      observedCodexSkillReads(
+        {
+          ...commandItem("bash -lc 'cat .agents/skills/review/SKILL.md | head -n 30'"),
+          aggregatedOutput: "\u001b[31mcat: missing: No such file or directory\u001b[0m",
+        },
+        [unixSkill],
+        "/home/me",
+      ),
+    ).toEqual([]);
+    const multiline = "nl .agents/skills/review/SKILL.md\nnl other.txt";
+    expect(
+      observedCodexSkillReads(
+        {
+          ...commandItem(multiline),
+          aggregatedOutput: "nl: missing: No such file or directory",
+          commandActions: [
+            { type: "read", command: multiline, name: "SKILL.md", path: unixSkill.path },
+          ],
+        },
+        [unixSkill],
+        "/home/me",
       ),
     ).toEqual([]);
   });

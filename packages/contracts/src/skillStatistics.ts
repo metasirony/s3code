@@ -122,6 +122,48 @@ export const SkillStatistics = Schema.Struct({
 });
 export type SkillStatistics = typeof SkillStatistics.Type;
 
+export const SkillAnalyticsWindowDays = Schema.Literals([1, 7, 30, 90, 0]);
+export type SkillAnalyticsWindowDays = typeof SkillAnalyticsWindowDays.Type;
+
+export const GetSkillAnalyticsInput = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("environment"), days: SkillAnalyticsWindowDays }),
+  Schema.Struct({
+    kind: Schema.Literal("thread"),
+    threadId: ThreadId,
+    includeSubagents: Schema.Boolean,
+  }),
+]);
+export type GetSkillAnalyticsInput = typeof GetSkillAnalyticsInput.Type;
+
+const SkillAnalyticsCounts = Schema.Struct({
+  requests: NonNegativeInt,
+  reads: NonNegativeInt,
+});
+const SkillAnalyticsRow = Schema.Struct({
+  skill: SkillIdentity,
+  ...SkillAnalyticsCounts.fields,
+});
+export const SkillAnalyticsActor = Schema.Struct({
+  threadId: ThreadId,
+  title: Schema.String,
+  skills: Schema.Array(
+    Schema.Struct({ ...SkillAnalyticsRow.fields, latest: SkillAnalyticsCounts }),
+  ),
+});
+export type SkillAnalyticsActor = typeof SkillAnalyticsActor.Type;
+
+export const SkillAnalytics = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("environment"),
+    chatsWithReads: NonNegativeInt,
+    skills: Schema.Array(
+      Schema.Struct({ ...SkillAnalyticsRow.fields, fromSubagents: NonNegativeInt }),
+    ),
+  }),
+  Schema.Struct({ kind: Schema.Literal("thread"), actors: Schema.Array(SkillAnalyticsActor) }),
+]);
+export type SkillAnalytics = typeof SkillAnalytics.Type;
+
 export const GetSkillInvocationsInput = Schema.Struct({
   ...GetSkillStatisticsInput.fields,
   after: Schema.optional(NonNegativeInt),

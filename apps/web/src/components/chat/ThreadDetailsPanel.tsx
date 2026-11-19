@@ -32,6 +32,7 @@ import {
   type ThreadDetailsUsageInput,
 } from "./ThreadDetailsUsage";
 import { ThreadDetailsItemsMenuItems } from "./ThreadDetailsItemsMenu";
+import { ThreadDetailsSkills } from "./ThreadDetailsSkills";
 import { resolveThreadDetailsVisibility, THREAD_DETAILS_ITEMS } from "./threadDetailsItems";
 import { useClientSettings } from "../../hooks/useSettings";
 import { useProject, useServerConfigs } from "../../state/entities";
@@ -57,6 +58,7 @@ interface ThreadDetailsPanelProps extends Pick<
   projectId: ProjectId;
   worktreePath: string | null;
   isServerThread: boolean;
+  skillsOwnOnly?: boolean;
   draftId?: DraftId;
   composerDraftTarget: ComposerThreadTarget;
   activeProjectName: string | undefined;
@@ -288,6 +290,14 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
 
               {visible.context && props.usage.contextWindow ? (
                 <ThreadDetailsContext usage={props.usage.contextWindow} />
+              ) : null}
+              {visible.skills && props.isServerThread ? (
+                <ThreadDetailsSkills
+                  key={`${props.environmentId}:${props.threadId}`}
+                  environmentId={props.environmentId}
+                  threadId={props.threadId}
+                  ownOnly={props.skillsOwnOnly ?? false}
+                />
               ) : null}
 
               {/* Shown only when no section above has content, so an emptied card can be refilled. */}

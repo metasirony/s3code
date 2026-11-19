@@ -3860,6 +3860,7 @@ export default function ChatView(props: ChatViewProps) {
                   projectId={activeThread.projectId}
                   worktreePath={activeThread.worktreePath}
                   isServerThread={isServerThread}
+                  skillsOwnOnly={isSubagentThread || isProviderSubagent}
                   {...(draftId ? { draftId } : {})}
                   composerDraftTarget={composerDraftTarget}
                   activeProjectName={activeProject?.title}

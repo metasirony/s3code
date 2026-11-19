@@ -1915,6 +1915,12 @@ const WsGetSkillStatisticsRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.getSkillSta
   success: OrchestrationV2RpcSchemas.getSkillStatistics.output,
   error: Schema.Union([SkillStatisticsReadError, EnvironmentAuthorizationError]),
 });
+const WsGetSkillAnalyticsRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.getSkillAnalytics, {
+  payload: OrchestrationV2RpcSchemas.getSkillAnalytics.input,
+  success: OrchestrationV2RpcSchemas.getSkillAnalytics.output,
+  error: Schema.Union([SkillStatisticsReadError, EnvironmentAuthorizationError]),
+});
+
 const WsGetSkillInvocationsRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.getSkillInvocations, {
   payload: OrchestrationV2RpcSchemas.getSkillInvocations.input,
   success: OrchestrationV2RpcSchemas.getSkillInvocations.output,
@@ -2295,6 +2301,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2ForceStopThreadRpc,
   WsGetSkillStatisticsRpc,
   WsGetSkillInvocationsRpc,
+  WsGetSkillAnalyticsRpc,
   WsOrchestrationV2GetTurnItemRpc,
   WsOrchestrationV2GetTurnDiffRpc,
   WsOrchestrationV2GetFullThreadDiffRpc,

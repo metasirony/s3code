@@ -2024,6 +2024,8 @@ export const layerWsRpc = (
           threadManagement.getSkillStatistics(input),
         [ORCHESTRATION_V2_WS_METHODS.getSkillInvocations]: (input) =>
           threadManagement.getSkillInvocations(input),
+        [ORCHESTRATION_V2_WS_METHODS.getSkillAnalytics]: (input) =>
+          threadManagement.getSkillAnalytics(input),
         [ORCHESTRATION_V2_WS_METHODS.getTurnItem]: (input) =>
           threadManagement.getTurnItem(input).pipe(
             Effect.mapError(

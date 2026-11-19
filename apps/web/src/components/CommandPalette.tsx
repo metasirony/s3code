@@ -58,6 +58,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
   BugIcon,
+  BoxIcon,
   ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronRightIcon,
@@ -1677,6 +1678,17 @@ function OpenCommandPaletteDialog(props: {
     shortcutCommand: "usage.open",
     run: async () => {
       await navigate({ to: "/usage" });
+    },
+  });
+
+  actionItems.push({
+    kind: "action",
+    value: "action:skill-analytics",
+    searchTerms: ["skills", "skill statistics", "skill reads", "analytics"],
+    title: "Open skill analytics",
+    icon: <BoxIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/skills" });
     },
   });
 

@@ -2838,13 +2838,15 @@ it.effect(
       const projection = yield* store.getThreadProjection(threadId);
       const template = projection.runs[0]!;
       const now = projection.updatedAt;
+      const at = (daysAgo: number, offsetMs = 0) =>
+        DateTime.formatIso(DateTime.add(now, { milliseconds: offsetMs - daysAgo * 86_400_000 }));
       const runs = [1, 2, 3].map((ordinal) => ({
         ...template,
         id: RunId.make(`skills:${ordinal}`),
         ordinal: ordinal + 1,
         status: "completed" as const,
       }));
-      for (const run of runs)
+      for (const run of runs.slice(0, 2))
         yield* store.apply({
           id: EventId.make(`skills:run:${run.id}`),
           type: "run.created",
@@ -2892,12 +2894,43 @@ it.effect(
             occurrence: index,
             source: observation.source,
             skill: observation.skill,
-            observedAt: DateTime.formatIso(now),
+            observedAt: [at(0), at(1), at(1, -1), at(8), at(31)][index]!,
           },
         };
         yield* store.apply(event);
         yield* store.apply({ ...event, id: EventId.make(`skills:redelivery:${index}`) });
       }
+      const latest = runs[2]!;
+      yield* store.apply({
+        id: EventId.make(`skills:run:${latest.id}`),
+        type: "run.created",
+        threadId,
+        occurredAt: now,
+        payload: {
+          ...latest,
+          status: "queued",
+          queueHeld: true,
+          startedAt: null,
+          completedAt: null,
+        },
+      });
+      const withHeld = yield* store.getSkillAnalytics({
+        kind: "thread",
+        threadId,
+        includeSubagents: true,
+      });
+      assert(withHeld.kind === "thread");
+      assert.deepEqual(
+        withHeld.actors[0]?.skills.map((row) => row.latest.reads),
+        [1, 1],
+      );
+      yield* store.apply({
+        id: EventId.make(`skills:run:${latest.id}:completed`),
+        type: "run.updated",
+        threadId,
+        occurredAt: now,
+        payload: latest,
+      });
       const stats = yield* store.getSkillStatistics({ threadId });
       assert.equal(stats.total, 5);
       assert.equal(stats.userRequested, 1);
@@ -2909,6 +2942,43 @@ it.effect(
       assert.equal(stats.threads[0]?.latestRunId, runs[2]!.id);
       assert.equal(stats.threads[0]?.latestRunCount, 0);
       assert.equal(stats.threads[0]?.beforeLatestRunCount, 5);
+      const chat = yield* store.getSkillAnalytics({
+        kind: "thread",
+        threadId,
+        includeSubagents: true,
+      });
+      assert(chat.kind === "thread");
+      assert.deepEqual(
+        chat.actors[0]?.skills.map(({ requests, reads, latest }) => [
+          requests,
+          reads,
+          latest.requests,
+          latest.reads,
+        ]),
+        [
+          [0, 1, 0, 0],
+          [1, 3, 0, 0],
+        ],
+      );
+      for (const [days, reads] of [
+        [1, 1],
+        [7, 2],
+        [30, 3],
+        [90, 4],
+        [0, 4],
+      ] as const) {
+        const analytics = yield* store.getSkillAnalytics({ kind: "environment", days });
+        assert(analytics.kind === "environment");
+        assert.equal(analytics.chatsWithReads, 1);
+        assert.equal(
+          analytics.skills.reduce((sum, row) => sum + row.requests, 0),
+          1,
+        );
+        assert.equal(
+          analytics.skills.reduce((sum, row) => sum + row.reads, 0),
+          reads,
+        );
+      }
       const page = yield* store.getSkillInvocations({ threadId, limit: 2 });
       assert.equal(page.invocations.length, 2);
       assert.isNotNull(page.nextCursor);
@@ -3223,6 +3293,39 @@ it.effect("keeps descendant skill credits on the parent run that owned the child
     const appOwnStats = yield* store.getSkillStatistics({ threadId: appId, scope: "own" });
     assert.equal(environment.scope, "own");
     assert.equal(environment.total, 8);
+    const analytics = yield* store.getSkillAnalytics({ kind: "environment", days: 0 });
+    assert(analytics.kind === "environment");
+    assert.equal(analytics.chatsWithReads, 2);
+    assert.deepInclude(analytics.skills[0], { reads: 8, fromSubagents: 6 });
+    const chat = yield* store.getSkillAnalytics({
+      kind: "thread",
+      threadId: parentId,
+      includeSubagents: true,
+    });
+    assert(chat.kind === "thread");
+    assert.deepEqual(
+      Object.fromEntries(
+        chat.actors.map((actor) => [
+          actor.threadId,
+          [actor.skills[0]?.reads, actor.skills[0]?.latest.reads],
+        ]),
+      ),
+      { [appId]: [2, 0], [nativeId]: [3, 0], [nestedId]: [1, 0], [parentId]: [1, 0] },
+    );
+    const appAnalytics = yield* store.getSkillAnalytics({
+      kind: "thread",
+      threadId: appId,
+      includeSubagents: false,
+    });
+    assert(appAnalytics.kind === "thread");
+    assert.deepEqual(
+      appAnalytics.actors.map((actor) => actor.threadId),
+      [appId],
+    );
+    assert.deepInclude(appAnalytics.actors[0]?.skills[0], {
+      reads: 3,
+      latest: { reads: 1, requests: 0 },
+    });
     assert.equal(
       environment.threads.reduce((sum, thread) => sum + thread.total, 0),
       environment.total,
@@ -3591,6 +3694,16 @@ it.effect("keeps skill totals and the last empty run after closing and reopening
       assert.equal(child.total, 1);
       assert.equal(child.threads[0]?.latestNativeTurnId, ProviderTurnId.make("restart:native:2"));
       assert.equal(child.threads[0]?.latestNativeTurnCount, 0);
+      const analytics = yield* store.getSkillAnalytics({
+        kind: "thread",
+        threadId: ThreadId.make("restart:native-child"),
+        includeSubagents: false,
+      });
+      assert(analytics.kind === "thread");
+      assert.deepInclude(analytics.actors[0]?.skills[0], {
+        reads: 1,
+        latest: { reads: 0, requests: 0 },
+      });
       assert.equal(child.threads[0]?.beforeLatestNativeTurnCount, 1);
       assert.deepEqual(child.threads[0]?.activeNativeTurnIds, [
         ProviderTurnId.make("restart:native:2"),

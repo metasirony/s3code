@@ -82,6 +82,13 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
     });
   };
   return {
+    skillAnalytics: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:orchestration:skill-analytics",
+      tag: ORCHESTRATION_V2_WS_METHODS.getSkillAnalytics,
+      idleTtlMs: 0,
+      staleTimeMs: 0,
+      refreshIntervalMs: 15_000,
+    }),
     threadTitles: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:orchestration:thread-titles",
       tag: ORCHESTRATION_V2_WS_METHODS.getThreadTitles,

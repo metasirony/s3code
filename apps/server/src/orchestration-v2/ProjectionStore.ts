@@ -454,6 +454,7 @@ export interface OlderSettledThreadsListing {
 export interface ProjectionStoreV2Shape {
   readonly getSkillStatistics: Effect.Success<typeof makeSkillStatistics>["getSkillStatistics"];
   readonly getSkillInvocations: Effect.Success<typeof makeSkillStatistics>["getSkillInvocations"];
+  readonly getSkillAnalytics: Effect.Success<typeof makeSkillStatistics>["getSkillAnalytics"];
   readonly searchThreadStream: (
     input: OrchestrationV2SearchThreadInput,
   ) => Stream.Stream<OrchestrationV2SearchThreadResult, ProjectionStoreV2Error>;
@@ -8058,6 +8059,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getNextTurnItemOrdinal: readOnReader(getNextTurnItemOrdinal),
       getSkillStatistics: readOnReader(skillStatistics.getSkillStatistics),
       getSkillInvocations: readOnReader(skillStatistics.getSkillInvocations),
+      getSkillAnalytics: readOnReader(skillStatistics.getSkillAnalytics),
       getTurnItem: readOnReader(getTurnItem),
       getMessagesById: readOnReader(getMessagesById),
       getThreadRecords: (threadId, fields, filter) =>
