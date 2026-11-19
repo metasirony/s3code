@@ -5,11 +5,15 @@ import {
   ThreadId,
   RunId,
   ProviderTurnId,
+  type GetSkillAnalyticsInput,
   type GetSkillStatisticsInput,
   type GetSkillInvocationsInput,
   type SkillStatistics,
   type SkillInvocationsPage,
+  type SkillAnalytics,
+  type SkillAnalyticsActor,
 } from "@t3tools/contracts";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -177,11 +181,15 @@ export const makeSkillStatistics = Effect.gen(function* () {
     );
   });
 
-  const matchedRows = (input: GetSkillStatisticsInput) => {
+  const matchedRows = (
+    input: GetSkillStatisticsInput,
+    timeRange?: { since: number; until: number },
+  ) => {
     const inclusive = inclusiveOf(input);
     return sql`SELECT i.invocation_id, i.thread_id AS executor_thread_id, i.run_id AS binding_run_id,
         i.source, i.skill_key, i.sequence, i.payload_json, c.scope_thread_id, c.scope_run_id, c.scope_provider_turn_id, c.role, c.origin
       FROM orchestration_v2_skill_invocations i
+      ${timeRange === undefined ? sql`` : sql`INDEXED BY orchestration_v2_skill_invocations_observed_at`}
       JOIN orchestration_v2_skill_invocation_credits c ON c.invocation_id = i.invocation_id
       JOIN orchestration_v2_projection_runs binding
         ON binding.run_id = i.run_id AND binding.status <> 'rolled_back'
@@ -194,6 +202,13 @@ export const makeSkillStatistics = Effect.gen(function* () {
       JOIN orchestration_v2_projection_threads scope_thread
         ON scope_thread.thread_id = c.scope_thread_id AND scope_thread.deleted_at IS NULL
       WHERE ${inclusive ? sql`c.role IN ('self', 'descendant')` : sql`c.role = 'self'`}
+      ${
+        timeRange === undefined
+          ? sql``
+          : sql`
+        AND unixepoch(json_extract(i.payload_json, '$.observedAt'), 'subsec')
+          BETWEEN ${timeRange.since} AND ${timeRange.until}`
+      }
       ${input.threadId === undefined ? sql`` : sql`AND c.scope_thread_id = ${input.threadId}`}
       ${input.providerTurnId === undefined ? sql`` : sql`AND c.scope_provider_turn_id = ${input.providerTurnId}`}
       ${
@@ -436,5 +451,125 @@ export const makeSkillStatistics = Effect.gen(function* () {
       };
     }).pipe(Effect.mapError((cause) => new SkillStatisticsReadError({ cause })));
   });
-  return { getSkillStatistics, getSkillInvocations, recordSkillInvocation };
+
+  const getSkillAnalytics = Effect.fn("ProjectionStoreV2.getSkillAnalytics")(function* (
+    input: GetSkillAnalyticsInput,
+  ): Effect.fn.Return<SkillAnalytics, SkillStatisticsReadError> {
+    return yield* sql
+      .withTransaction(
+        Effect.gen(function* () {
+          if (input.kind === "environment") {
+            const now = (yield* Clock.currentTimeMillis) / 1_000;
+            const observations = matchedRows(
+              {},
+              input.days === 0 ? undefined : { since: now - input.days * 86_400, until: now },
+            );
+            const rows = yield* sql<{
+              skill: string;
+              requests: number;
+              reads: number;
+              fromSubagents: number;
+            }>`
+            SELECT json_extract(MAX(payload_json), '$.skill') AS skill,
+              SUM(source = 'user_requested') AS requests,
+              SUM(source = 'agent_observed') AS reads,
+              SUM(source = 'agent_observed' AND origin <> 'root') AS fromSubagents
+            FROM (${observations}) observations
+            GROUP BY skill_key`;
+            // Group credited child reads with their top-level chat when that credit is still visible.
+            const chats = yield* sql<{ count: number }>`
+            SELECT COUNT(DISTINCT COALESCE((
+              SELECT credit.scope_thread_id
+              FROM orchestration_v2_skill_invocation_credits credit
+              JOIN orchestration_v2_projection_runs r
+                ON r.run_id = credit.scope_run_id AND r.status <> 'rolled_back'
+              JOIN orchestration_v2_projection_threads t
+                ON t.thread_id = credit.scope_thread_id AND t.deleted_at IS NULL
+              WHERE observations.origin <> 'root'
+                AND credit.invocation_id = observations.invocation_id
+                AND credit.role = 'descendant'
+                AND json_extract(t.payload_json, '$.lineage.relationshipToParent') IS NOT 'subagent'
+              ORDER BY t.created_at, t.thread_id LIMIT 1
+            ), executor_thread_id)) AS count
+            FROM (${observations}) observations
+            WHERE source = 'agent_observed'`;
+            return {
+              kind: "environment" as const,
+              chatsWithReads: chats[0]?.count ?? 0,
+              skills: yield* Effect.forEach(rows, ({ skill, ...counts }) =>
+                decodeSkill(skill).pipe(Effect.map((identity) => ({ skill: identity, ...counts }))),
+              ),
+            };
+          }
+
+          const { threadId, includeSubagents } = input;
+          const rows = yield* sql<{
+            threadId: ThreadId;
+            title: string;
+            skill: string;
+            requests: number;
+            reads: number;
+            latestRequests: number;
+            latestReads: number;
+          }>`
+          WITH latest AS (
+            SELECT
+              (SELECT run_id FROM orchestration_v2_projection_runs
+                WHERE thread_id = ${threadId} AND status <> 'rolled_back'
+                  AND NOT (status = 'queued' AND json_extract(payload_json, '$.queueHeld') IS 1)
+                ORDER BY ordinal DESC LIMIT 1) AS run_id,
+              (SELECT p.provider_turn_id FROM orchestration_v2_projection_provider_turns p
+                JOIN orchestration_v2_projection_runs r
+                  ON r.run_id = p.binding_run_id AND r.status <> 'rolled_back'
+                JOIN orchestration_v2_projection_threads owner
+                  ON owner.thread_id = r.thread_id AND owner.deleted_at IS NULL
+                WHERE p.thread_id = ${threadId} AND p.run_attempt_id IS NULL
+                ORDER BY p.started_at DESC, p.ordinal DESC, p.provider_turn_id DESC LIMIT 1) AS turn_id
+          ),
+          observations AS (
+            SELECT MAX(executor_thread_id) AS executor_thread_id, MAX(source) AS source,
+              MAX(skill_key) AS skill_key, MAX(payload_json) AS payload_json,
+              MAX(CASE WHEN latest.run_id IS NOT NULL THEN
+                  matched.scope_run_id = latest.run_id
+                ELSE matched.scope_provider_turn_id = latest.turn_id END) AS is_latest
+            FROM (${matchedRows({ threadId, scope: includeSubagents ? "inclusive" : "own" })}) matched
+            CROSS JOIN latest
+            GROUP BY invocation_id
+          )
+          SELECT executor_thread_id AS threadId, t.title,
+            json_extract(MAX(observations.payload_json), '$.skill') AS skill,
+            SUM(source = 'user_requested') AS requests,
+            SUM(source = 'agent_observed') AS reads,
+            SUM(source = 'user_requested' AND is_latest IS TRUE) AS latestRequests,
+            SUM(source = 'agent_observed' AND is_latest IS TRUE) AS latestReads
+          FROM observations
+          JOIN orchestration_v2_projection_threads t ON t.thread_id = executor_thread_id
+          GROUP BY executor_thread_id, skill_key
+          ORDER BY t.title, executor_thread_id, skill_key`;
+          const actors = new Map<
+            ThreadId,
+            Omit<SkillAnalyticsActor, "skills"> & {
+              skills: SkillAnalyticsActor["skills"][number][];
+            }
+          >();
+          for (const row of rows) {
+            let actor = actors.get(row.threadId);
+            if (actor === undefined) {
+              actor = { threadId: row.threadId, title: row.title, skills: [] };
+              actors.set(row.threadId, actor);
+            }
+            actor.skills.push({
+              skill: yield* decodeSkill(row.skill),
+              requests: row.requests,
+              reads: row.reads,
+              latest: { requests: row.latestRequests, reads: row.latestReads },
+            });
+          }
+          return { kind: "thread" as const, actors: Array.from(actors.values()) };
+        }),
+      )
+      .pipe(Effect.mapError((cause) => new SkillStatisticsReadError({ cause })));
+  });
+
+  return { getSkillStatistics, getSkillInvocations, getSkillAnalytics, recordSkillInvocation };
 });

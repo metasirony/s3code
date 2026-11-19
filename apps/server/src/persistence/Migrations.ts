@@ -88,6 +88,7 @@ import Migration0082 from "./Migrations/082_TurnItemConversationIndex.ts";
 import Migration0083 from "./Migrations/083_CommandReadIndexes.ts";
 import Migration0084 from "./Migrations/084_SkillInvocations.ts";
 import Migration0085 from "./Migrations/085_SkillInvocationCredits.ts";
+import Migration0086 from "./Migrations/086_SkillInvocationObservedAt.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -176,6 +177,7 @@ const migrationEntries = [
   [83, "CommandReadIndexes", Migration0083],
   [84, "SkillInvocations", Migration0084],
   [85, "SkillInvocationCredits", Migration0085],
+  [86, "SkillInvocationObservedAt", Migration0086],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

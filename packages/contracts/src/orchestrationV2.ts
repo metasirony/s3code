@@ -1,5 +1,7 @@
 import {
   SkillInvocation,
+  GetSkillAnalyticsInput,
+  SkillAnalytics,
   GetSkillStatisticsInput,
   SkillStatistics,
   GetSkillInvocationsInput,
@@ -3708,6 +3710,7 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   forceStopThread: "orchestration.forceStopThread",
   getSkillStatistics: "orchestration.getSkillStatistics",
   getSkillInvocations: "orchestration.getSkillInvocations",
+  getSkillAnalytics: "orchestration.getSkillAnalytics",
   getTurnItem: "orchestration.getTurnItem",
   launchThread: "orchestration.launchThread",
   subscribeShell: "orchestration.subscribeShell",
@@ -4414,6 +4417,7 @@ export const OrchestrationV2RpcSchemas = {
   },
   getSkillStatistics: { input: GetSkillStatisticsInput, output: SkillStatistics },
   getSkillInvocations: { input: GetSkillInvocationsInput, output: SkillInvocationsPage },
+  getSkillAnalytics: { input: GetSkillAnalyticsInput, output: SkillAnalytics },
   getTurnItem: {
     input: OrchestrationV2GetTurnItemInput,
     output: OrchestrationV2GetTurnItemResult,

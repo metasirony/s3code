@@ -18,6 +18,7 @@ const RPC_AGGREGATES = {
   [ORCHESTRATION_V2_WS_METHODS.forceStopThread]: "orchestration",
   [ORCHESTRATION_V2_WS_METHODS.getSkillStatistics]: "orchestration",
   [ORCHESTRATION_V2_WS_METHODS.getSkillInvocations]: "orchestration",
+  [ORCHESTRATION_V2_WS_METHODS.getSkillAnalytics]: "orchestration",
   [ORCHESTRATION_V2_WS_METHODS.getTurnItem]: "orchestration",
   [ORCHESTRATION_V2_WS_METHODS.getTurnDiff]: "orchestration",
   [ORCHESTRATION_V2_WS_METHODS.getFullThreadDiff]: "orchestration",

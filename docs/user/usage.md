@@ -57,6 +57,20 @@ saved totals first, then updates them when Cursor's API responds.
 If recent work is missing or a new model shows no cost, refresh to rescan session history and
 update model pricing.
 
+## Track skill reads
+
+On web and desktop, expand **Skills** in a chat’s thread details to see the main agent’s recorded
+skill reads and the contribution from subagents. Choose **Latest turn** to see activity in the most
+recent turn. **New** marks skills whose first recorded read by that agent was in the latest turn.
+Open a subagent’s chat to see its own reads.
+
+Open **Skill analytics** next to **Usage** for all chats. Filter by environment and period, or
+search by skill name or instruction path. Totals cover the environments that returned data.
+
+**Reads** counts observed successful reads of skill instructions, including repeats.
+Detection currently covers supported Codex skill reads. **Requests** counts user requests
+separately. **From subagents** shows the portion of **Reads** attributed to subagents.
+
 ## Set custom model prices
 
 On web or desktop, open the environment dropdown on **Usage**, then choose **Model prices** to add,
